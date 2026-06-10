@@ -89,7 +89,7 @@ next_24h = now_pkt + timedelta(hours=24)
 
 @st.cache_data(ttl=300)
 def load_data():
-    df = pd.read_csv("FIFA_WC_2026_data.csv")
+    df = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
     df["date"] = pd.to_datetime(df["date"], dayfirst=True, format = "mixed")
     return df
 
