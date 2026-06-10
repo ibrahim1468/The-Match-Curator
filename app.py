@@ -745,9 +745,10 @@ from pathlib import Path
 import base64
 
 BASE_DIR = Path(__file__).resolve().parent
+FLAG_DIR = BASE_DIR / "assets" / "flags"
 
 def get_flag_b64(team_name):
-    flag_path = BASE_DIR / "assets" / "flags" / f"{team_name}.png"
+    flag_path = FLAG_DIR / f"{team_name}.png"
     
     try:
         with open(flag_path, "rb") as f:
@@ -758,7 +759,7 @@ def get_flag_b64(team_name):
         style='height:28px; width:42px; object-fit:cover;
         border-radius:3px; vertical-align:middle; margin:0 4px;'>
         """
-    except:
+    except Exception as e:
         return ""
 
 CATEGORY_COLORS = {
