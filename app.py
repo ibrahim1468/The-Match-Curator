@@ -745,7 +745,7 @@ import base64
 from pathlib import Path
 
 def get_flag_b64(team_name):
-    flag_path = Path("Assets\Flags") / f"{team_name}.png"
+    flag_path = Path("assets\Flags") / f"{team_name}.png"
     try:
         with open(flag_path, "rb") as f:
             data = base64.b64encode(f.read()).decode("utf-8")
