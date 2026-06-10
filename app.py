@@ -741,15 +741,23 @@ def pkt_to_user(time_str, offset=5):
     except:
         return str(time_str), 0
     
-import base64
 from pathlib import Path
+import base64
+
+BASE_DIR = Path(__file__).resolve().parent
 
 def get_flag_b64(team_name):
-    flag_path = Path("assets\Flags") / f"{team_name}.png"
+    flag_path = BASE_DIR / "assets" / "flags" / f"{team_name}.png"
+    
     try:
         with open(flag_path, "rb") as f:
             data = base64.b64encode(f.read()).decode("utf-8")
-        return f"<img src='data:image/png;base64,{data}' style='height:28px; width:42px; object-fit:cover; border-radius:3px; vertical-align:middle; margin:0 4px;'>"
+
+        return f"""
+        <img src='data:image/png;base64,{data}'
+        style='height:28px; width:42px; object-fit:cover;
+        border-radius:3px; vertical-align:middle; margin:0 4px;'>
+        """
     except:
         return ""
 
