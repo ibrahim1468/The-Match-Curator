@@ -744,6 +744,9 @@ def pkt_to_user(time_str, offset=5):
 from pathlib import Path
 import base64
 
+BASE_DIR = Path(__file__).resolve().parent
+FLAG_DIR = BASE_DIR / "Assets" / "Flags"
+
 def get_flag_b64(team_name):
     if not team_name or pd.isna(team_name):
         return ""
