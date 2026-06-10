@@ -744,25 +744,28 @@ def pkt_to_user(time_str, offset=5):
 from pathlib import Path
 import base64
 
-BASE_DIR = Path(__file__).resolve().parent
-FLAG_DIR = BASE_DIR / "assets" / "flags"
-
 def get_flag_b64(team_name):
-    team_name = team_name.strip()
+    if not team_name or pd.isna(team_name):
+        return ""
+    
+    team_name = str(team_name).strip()
     flag_path = FLAG_DIR / f"{team_name}.png"
+    
+    if not flag_path.exists():
+        alt_name = team_name.replace(" ", "").replace(" and ", "&")
+        flag_path = FLAG_DIR / f"{alt_name}.png"
     
     try:
         with open(flag_path, "rb") as f:
             data = base64.b64encode(f.read()).decode("utf-8")
-
         return f"""
-        <img src='data:image/png;base64,{data}'
-        style='height:28px; width:42px; object-fit:cover;
-        border-radius:3px; vertical-align:middle; margin:0 4px;'>
+        <img src='data:image/png;base64,{data}' 
+             style='height:28px; width:42px; object-fit:cover;
+             border-radius:3px; vertical-align:middle; margin:0 4px;'>
         """
-    except Exception as e:
-        return ""
-
+    except Exception:
+        return f"<span style='color:#666; font-size:0.9rem;'>[{team_name}]</span>"
+        
 CATEGORY_COLORS = {
     "Must Watch":     {"bg": "#d4f5d4", "border": "#2d8a2d", "badge_bg": "#2d8a2d", "badge_text": "#ffffff"},
     "Worth Watching": {"bg": "#d0f0f8", "border": "#0099bb", "badge_bg": "#0099bb", "badge_text": "#ffffff"},
