@@ -748,6 +748,7 @@ BASE_DIR = Path(__file__).resolve().parent
 FLAG_DIR = BASE_DIR / "assets" / "flags"
 
 def get_flag_b64(team_name):
+    team_name = team_name.strip()
     flag_path = FLAG_DIR / f"{team_name}.png"
     
     try:
