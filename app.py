@@ -1344,10 +1344,13 @@ else:
 # ── Group Standings Tab ───────────────────────────────────────────────────────
 if "standings" in active_tabs:
     with tab_standings:
-        standings = build_group_standings(df)
-        if not standings:
-            st.markdown("<p style='color:#888; text-align:center; padding:2rem;'>Standings will appear once matches begin.</p>", unsafe_allow_html=True)
+        if "standings_loaded" not in st.session_state:
+            st.markdown("<p style='color:#888; text-align:center; padding:2rem; font-family:Barlow,sans-serif;'>Click to load standings</p>", unsafe_allow_html=True)
+            if st.button("📊 Load Standings", use_container_width=True):
+                st.session_state["standings_loaded"] = True
+                st.rerun()
         else:
+            standings = build_group_standings(df)
             groups = list(standings.keys())
             rows = [groups[i:i+4] for i in range(0, len(groups), 4)]
             for group_row in rows:
