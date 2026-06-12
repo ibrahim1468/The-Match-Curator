@@ -3,21 +3,25 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import requests
 
-@st.cache_data(ttl=84*24*3600)  # cache for 84 days (token validity)
+@st.cache_data(ttl=3600)
 def get_wc_token():
     try:
         EMAIL = "matchcurator_prod_v1@noreply.com"
+        PASSWORD = "SecurePass123!"
 
+        # Try login first
         r = requests.post(
-            "https://worldcup26.ir/auth/register",
-            json={"name": "MatchCurator", "email": EMAIL, "password": "SecurePass123!"},
+            "https://worldcup26.ir/auth/authenticate",
+            json={"email": EMAIL, "password": PASSWORD},
             timeout=5
         )
         if r.status_code == 200:
             return r.json().get("token")
+
+        # If login fails, try registering
         r2 = requests.post(
-            "https://worldcup26.ir/auth/authenticate",
-            json={"email": EMAIL, "password": "SecurePass123!"},
+            "https://worldcup26.ir/auth/register",
+            json={"name": "MatchCurator", "email": EMAIL, "password": PASSWORD},
             timeout=5
         )
         if r2.status_code == 200:
@@ -25,6 +29,9 @@ def get_wc_token():
     except:
         pass
     return None
+
+pythonst.write(get_wc_token())
+
 @st.cache_data(ttl=60)
 def get_live_scores():
     try:
@@ -87,7 +94,7 @@ now_pkt = NOW
 today = NOW.date()
 next_24h = now_pkt + timedelta(hours=24)
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_data():
     df = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
     df["date"] = pd.to_datetime(df["date"], dayfirst=True, format = "mixed")
@@ -761,14 +768,10 @@ def get_flag_b64(team_name):
     try:
         with open(flag_path, "rb") as f:
             data = base64.b64encode(f.read()).decode("utf-8")
-        return f"""
-        <img src='data:image/png;base64,{data}' 
-             style='height:28px; width:42px; object-fit:cover;
-             border-radius:3px; vertical-align:middle; margin:0 4px;'>
-        """
+        return f"<img src='data:image/png;base64,{data}' style='height:28px; width:42px; object-fit:cover; border-radius:3px; vertical-align:middle; margin:0 4px;'>"
     except Exception:
         return f"<span style='color:#666; font-size:0.9rem;'>[{team_name}]</span>"
-        
+    
 CATEGORY_COLORS = {
     "Must Watch":     {"bg": "#d4f5d4", "border": "#2d8a2d", "badge_bg": "#2d8a2d", "badge_text": "#ffffff"},
     "Worth Watching": {"bg": "#d0f0f8", "border": "#0099bb", "badge_bg": "#0099bb", "badge_text": "#ffffff"},
@@ -1317,7 +1320,7 @@ else:
     <div style='margin-bottom:1.5rem;'>
         <p style='font-family:Bebas Neue,sans-serif; font-size:2rem; 
         color:#ffffff; letter-spacing:0.1em; margin:0;'>
-        Matches Worth Watching Today</p>
+        Matches Worth Watching in the next 24h</p>
         <p style='font-family:Barlow,sans-serif; font-size:0.9rem; 
         color:#888; margin-top:0.2rem;'>
         {match_count} match{'es' if match_count > 1 else ''} · 
@@ -1337,7 +1340,7 @@ if PRE_TOURNAMENT:
 else:
     tab_standings, tab_schedule = st.tabs([
         "📊 Group Standings",
-        "📅 Remaining Matches"
+        "📅 Fixtures & Results"
     ])
     active_tabs = ["standings", "schedule"]
 
@@ -1354,49 +1357,45 @@ if "standings" in active_tabs:
                 cols = st.columns(len(group_row))
                 for col, group in zip(cols, group_row):
                     with col:
-                        st.markdown(
+                        group_html = (
                             f"<p style='font-family:Bebas Neue,sans-serif; font-size:1.2rem; "
                             f"color:#ffffff; letter-spacing:0.1em; margin-bottom:0.5rem; "
                             f"border-left:3px solid #ffffff; padding-left:0.6rem;'>"
-                            f"Group {group}</p>",
-                            unsafe_allow_html=True
+                            f"Group {group}</p>"
                         )
-                        for rank_idx, (team, stats) in enumerate(standings[group], 1):
-                            if rank_idx <= 2:
-                                bg = "#1a2e1a"
-                                border = "#2d8a2d"
-                                rank_color = "#90ee90"
-                            else:
-                                bg = "#1a1a1a"
-                                border = "#333333"
-                                rank_color = "#666666"
 
+                        for rank_idx, (team, stats) in enumerate(standings[group], 1):
+                            bg = "#1a2e1a" if rank_idx <= 2 else "#1a1a1a"
+                            border = "#2d8a2d" if rank_idx <= 2 else "#333333"
+                            rank_color = "#90ee90" if rank_idx <= 2 else "#666666"
                             flag = get_flag_b64(team)
                             gd_str = f"+{stats['gd']}" if stats['gd'] > 0 else str(stats['gd'])
 
-                            st.markdown(f"""
-                            <div style='background:{bg}; border:1px solid {border}; 
-                            border-radius:8px; padding:0.5rem 0.75rem; margin-bottom:0.4rem;
-                            font-family:Barlow,sans-serif;'>
-                                <div style='display:flex; justify-content:space-between; align-items:center;'>
-                                    <div style='display:flex; align-items:center; gap:6px;'>
-                                        <span style='color:{rank_color}; font-weight:700; font-size:0.85rem; min-width:16px;'>{rank_idx}</span>
-                                        {flag}
-                                        <span style='color:#ffffff; font-size:0.85rem; font-weight:600;'>{team}</span>
-                                    </div>
-                                    <span style='color:#ffffff; font-weight:700; font-size:1rem;'>{stats['points']}</span>
-                                </div>
-                                <div style='display:flex; justify-content:space-between; 
-                                margin-top:0.3rem; font-size:0.72rem; color:#888;'>
-                                    <span>P:{stats['played']}</span>
-                                    <span>W:{stats['w']}</span>
-                                    <span>D:{stats['d']}</span>
-                                    <span>L:{stats['l']}</span>
-                                    <span>GF:{stats['gf']}</span>
-                                    <span>GD:{gd_str}</span>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            group_html += (
+                                f"<div style='background:{bg}; border:1px solid {border}; "
+                                f"border-radius:8px; padding:0.5rem 0.75rem; margin-bottom:0.4rem; "
+                                f"font-family:Barlow,sans-serif;'>"
+                                f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
+                                f"<div style='display:flex; align-items:center; gap:6px;'>"
+                                f"<span style='color:{rank_color}; font-weight:700; font-size:0.85rem; min-width:16px;'>{rank_idx}</span>"
+                                f"{flag}"
+                                f"<span style='color:#ffffff; font-size:0.85rem; font-weight:600;'>{team}</span>"
+                                f"</div>"
+                                f"<span style='color:#ffffff; font-weight:700; font-size:1rem;'>{stats['points']}</span>"
+                                f"</div>"
+                                f"<div style='display:flex; justify-content:space-between; "
+                                f"margin-top:0.3rem; font-size:0.72rem; color:#888;'>"
+                                f"<span>P:{stats['played']}</span>"
+                                f"<span>W:{stats['w']}</span>"
+                                f"<span>D:{stats['d']}</span>"
+                                f"<span>L:{stats['l']}</span>"
+                                f"<span>GF:{stats['gf']}</span>"
+                                f"<span>GD:{gd_str}</span>"
+                                f"</div>"
+                                f"</div>"
+                            )
+
+                        st.markdown(group_html, unsafe_allow_html=True)
 
 # ── Schedule Tab ──────────────────────────────────────────────────────────────
 # ── Schedule Tab ──────────────────────────────────────────────────────────────
@@ -1404,14 +1403,6 @@ with tab_schedule:
     st.info("Use the filters in the sidebar to control which matches appear.")
 
     schedule_df = df.copy()
-
-    # Show only remaining matches during tournament
-    if not PRE_TOURNAMENT:
-        schedule_df = schedule_df[
-            (schedule_df["winner"].isna()) |
-            (schedule_df["winner"] == "") |
-            (schedule_df["winner"] == "0")
-        ]
 
     # Apply sidebar filters
     if schedule_team != "All Teams":
@@ -1446,6 +1437,9 @@ with tab_schedule:
                 f"</span></p></div>",
                 unsafe_allow_html=True
             )
+            # Fetch live scores once per date group, not per row
+            live_scores = get_live_scores() if not PRE_TOURNAMENT else {}
+
             for _, row in date_group.iterrows():
                 category = str(row["category"])
                 colors = CATEGORY_COLORS.get(category, CATEGORY_COLORS["TBD"])
@@ -1461,9 +1455,37 @@ with tab_schedule:
                     str(row["team1"]) == favorite_team or
                     str(row["team2"]) == favorite_team
                 )
+
+                # Check live score for this match
+                live_match_data = None
+                if live_scores:
+                    t1 = str(row["team1"]).lower()
+                    t2 = str(row["team2"]).lower()
+                    for key, ldata in live_scores.items():
+                        if (t1 in ldata["home"].lower() or t1 in ldata["away"].lower()) and \
+                        (t2 in ldata["home"].lower() or t2 in ldata["away"].lower()):
+                            live_match_data = ldata
+                            break
                 with st.container():
                     left, right = st.columns([3, 1])
                     with left:
+                        if live_match_data:
+                            minute_map = {"1h": "1st Half", "2h": "2nd Half", "ht": "Half Time", "et": "Extra Time", "p": "Penalties"}
+                            minute_str = minute_map.get(live_match_data["minute"], live_match_data["minute"])
+                            st.markdown(
+                                f"<div style='display:inline-block; background:#cc0000; color:#ffffff; "
+                                f"font-size:0.8rem; font-weight:700; padding:0.25rem 0.7rem; "
+                                f"border-radius:4px; margin-top:0.3rem;'>"
+                                f"🔴 LIVE · {minute_str} &nbsp;|&nbsp; "
+                                f"{live_match_data['home_score']} — {live_match_data['away_score']}</div>",
+                                unsafe_allow_html=True
+                            )
+                        elif result_text:
+                            st.markdown(
+                                f"<div style='font-size:0.85rem; font-weight:600; color:#aaa; margin-top:0.3rem;'>"
+                                f"🏆 {result_text}</div>",
+                                unsafe_allow_html=True
+                            )
                         st.markdown(
                             f"<span style='background:{colors['badge_bg']}; color:{colors['badge_text']}; "
                             f"padding:0.2rem 0.7rem; border-radius:20px; font-size:0.7rem; "
