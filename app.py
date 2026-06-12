@@ -30,7 +30,7 @@ def get_wc_token():
         pass
     return None
 
-pythonst.write(get_wc_token())
+st.write(get_wc_token())
 
 @st.cache_data(ttl=60)
 def get_live_scores():
