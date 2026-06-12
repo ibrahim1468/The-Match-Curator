@@ -1248,9 +1248,8 @@ def render_card(row, favorite_team=None, rank=None):
 
     if extended_reason:
         with st.expander("+ More"):
-            st.markdown(f"<p style='font-family:Barlow,sans-serif; font-size:0.9rem; line-height:1.6; color:#333;'>{extended_reason}</p>",
+            st.markdown(f"<p style='font-family:Barlow,sans-serif; font-size:0.9rem; line-height:1.6; color:#cccccc;'>{extended_reason}</p>",
                        unsafe_allow_html=True)
-
 if POST_TOURNAMENT:
     st.markdown("""
     <div style='text-align:center; padding:4rem 2rem;'>
@@ -1480,12 +1479,7 @@ with tab_schedule:
                                 f"{live_match_data['home_score']} — {live_match_data['away_score']}</div>",
                                 unsafe_allow_html=True
                             )
-                        elif result_text:
-                            st.markdown(
-                                f"<div style='font-size:0.85rem; font-weight:600; color:#aaa; margin-top:0.3rem;'>"
-                                f"🏆 {result_text}</div>",
-                                unsafe_allow_html=True
-                            )
+                        
                         st.markdown(
                             f"<span style='background:{colors['badge_bg']}; color:{colors['badge_text']}; "
                             f"padding:0.2rem 0.7rem; border-radius:20px; font-size:0.7rem; "
@@ -1507,19 +1501,14 @@ with tab_schedule:
                         adjusted_date = row["date"] + pd.Timedelta(days=day_shift)
                         date_display = adjusted_date.strftime("%b %d")
                         if result_text and not live_match_data:
+                            s1 = str(row['score_team1']).split('.')[0]
+                            s2 = str(row['score_team2']).split('.')[0]
+                            winner_name = str(row['winner'])
                             st.markdown(
                                 f"<p style='text-align:right; font-family:Barlow,sans-serif; "
                                 f"font-size:1rem; color:#f0c040; font-weight:700; margin:0;'>"
-                                f"{str(row['score_team1']).split('.')[0]}–{str(row['score_team2']).split('.')[0]}<br>"
-                                f"<span style='font-size:0.75rem; color:#666; font-weight:400;'>{date_display}</span></p>",
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            # Upcoming or live — show time
-                            st.markdown(
-                                f"<p style='text-align:right; font-family:Barlow,sans-serif; "
-                                f"font-size:0.85rem; color:#aaa; margin:0;'>"
-                                f"{local_time} {USER_TZ_LABEL}<br>"
-                                f"<span style='font-size:0.75rem; color:#666;'>{date_display}</span></p>",
+                                f"{s1}–{s2}<br>"
+                                f"<span style='font-size:0.72rem; color:#f0c040; font-weight:500;'>{winner_name} win</span><br>"
+                                f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
