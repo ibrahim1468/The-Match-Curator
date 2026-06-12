@@ -30,8 +30,6 @@ def get_wc_token():
         pass
     return None
 
-st.write(get_wc_token())
-
 @st.cache_data(ttl=60)
 def get_live_scores():
     try:
