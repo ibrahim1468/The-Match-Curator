@@ -1187,7 +1187,7 @@ def render_card(row, favorite_team=None, rank=None):
         s1 = str(row["score_team1"]) if pd.notna(row["score_team1"]) else ""
         s2 = str(row["score_team2"]) if pd.notna(row["score_team2"]) else ""
         if s1 and s2:
-            result_text = f"{s1} — {s2} · Winner: {winner}"
+            result_text = f"{s1}–{s2} · {'Draw' if winner == 'Draw' else winner + ' win'}"
 
     # Pre-compute all variables
     rank_span = f"<span style='float:right; font-family:Barlow,sans-serif; font-size:0.85rem; color:#666;'>#{rank}</span>" if rank else ""
@@ -1505,11 +1505,12 @@ with tab_schedule:
                             s1 = str(row['score_team1']).split('.')[0]
                             s2 = str(row['score_team2']).split('.')[0]
                             winner_name = str(row['winner'])
+                            result_label = "Draw" if winner_name == "Draw" else f"{winner_name} win"
                             st.markdown(
                                 f"<p style='text-align:right; font-family:Barlow,sans-serif; "
                                 f"font-size:1rem; color:#f0c040; font-weight:700; margin:0;'>"
                                 f"{s1}–{s2}<br>"
-                                f"<span style='font-size:0.72rem; color:#f0c040; font-weight:500;'>{winner_name} win</span><br>"
+                                f"<span style='font-size:0.72rem; color:#f0c040; font-weight:500;'>{result_label}</span><br>"
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
