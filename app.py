@@ -99,6 +99,7 @@ def load_data():
     return df
 
 df = load_data()
+print(df[df["match_id"].isin([1,2])][["match_id","date","time","category"]].to_string())
 
 def get_match_datetime(row):
     try:
