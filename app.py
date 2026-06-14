@@ -719,6 +719,13 @@ TIMEZONE_OPTIONS = {
     }
 
 
+df_check = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
+df_check["date"] = pd.to_datetime(df_check["date"])
+df_check["local_date"] = df_check.apply(
+    lambda row: (row["date"] + pd.Timedelta(days=pkt_to_user(row["time"], user_tz_offset)[1])).date(), axis=1
+)
+st.write(df_check[["match_id","date","time","local_date","category"]].head(5))
+
 def pkt_to_user(time_str, offset=5):
     try:
         parts = str(time_str).split(":")
@@ -1533,15 +1540,3 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
-
-df_check = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
-df_check["date"] = pd.to_datetime(df_check["date"])
-df_check["local_date"] = df_check.apply(
-    lambda row: (row["date"] + pd.Timedelta(days=pkt_to_user(row["time"], user_tz_offset)[1])).date(), axis=1
-)
-st.write(df_check[["match_id","date","time","local_date","category"]].head(5))df_check = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
-df_check["date"] = pd.to_datetime(df_check["date"])
-df_check["local_date"] = df_check.apply(
-    lambda row: (row["date"] + pd.Timedelta(days=pkt_to_user(row["time"], user_tz_offset)[1])).date(), axis=1
-)
-st.write(df_check[["match_id","date","time","local_date","category"]].head(5))
