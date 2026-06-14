@@ -1435,10 +1435,16 @@ with tab_schedule:
     if schedule_stage != "All Stages":
         schedule_df = schedule_df[schedule_df["stage"] == schedule_stage]
 
-    schedule_df["local_date"] = schedule_df.apply(
-        lambda row: (row["date"] + pd.Timedelta(days=pkt_to_user(row["time"], user_tz_offset)[1])).date(), axis=1
+    def make_user_tz(offset):
+        h = int(offset)
+        m = int(round((offset - h) * 60))
+        return timezone(timedelta(hours=h, minutes=m))
+
+    user_tz = make_user_tz(user_tz_offset)
+
+    schedule_df["local_date"] = schedule_df["match_datetime"].apply(
+        lambda dt: dt.astimezone(user_tz).date()
     )
-    schedule_df = schedule_df.sort_values("local_date")
 
     if len(schedule_df) == 0:
         st.markdown("<p style='font-family:Barlow,sans-serif; color:#888; text-align:center; padding:2rem;'>No matches found with current filters.</p>", unsafe_allow_html=True)
@@ -1532,5 +1538,3 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
-st.write(df.dtypes)
-st.write(df[df["date"].astype(str).str.contains("2026-06-12")][["date","time"]].head())
