@@ -4,9 +4,7 @@ A FIFA World Cup match recommendation algorithm that does the homework for you a
 
 The app was built on 150+ years of football data to analyze every match of the upcoming FIFA WC for each and every casual fan out there, who needs guidance to watch what and skip what due to time and other constraints. The app does everything for you, you just need to watch now, no detailed homework to decide which match to watch. It does it for you
 
-Live App
-
-https://thematchcurator.streamlit.app
+Live App: https://thematchcurator.streamlit.app
 
 Features
 Match recommendations from Must Watch to Skip
