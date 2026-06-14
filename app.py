@@ -95,7 +95,7 @@ next_24h = now_pkt + timedelta(hours=24)
 @st.cache_data(ttl=60)
 def load_data():
     df = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
-    df["date"] = pd.to_datetime(df["date"], dayfirst=True, format = "mixed")
+    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
     return df
 
 df = load_data()
@@ -1536,5 +1536,3 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
-raw = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
-st.write(raw["date"].head(3).tolist())
