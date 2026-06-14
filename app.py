@@ -1195,9 +1195,9 @@ def render_card(row, favorite_team=None, rank=None):
     flag2 = get_flag_b64(row["team2"])
     team1 = str(row["team1"])
     team2 = str(row["team2"])
-    time_str, day_shift = pkt_to_user(row["time"], user_tz_offset)
-    adjusted_date = row["date"] + pd.Timedelta(days=day_shift)
-    date_str = adjusted_date.strftime("%b %d, %Y")
+    local_dt = row["match_datetime"].astimezone(user_tz)
+    time_str = local_dt.strftime("%H:%M")
+    date_str = local_dt.strftime("%b %d, %Y")
     venue = str(row["venue"])
     bg = colors["bg"]
     border = colors["border"]
@@ -1522,9 +1522,9 @@ with tab_schedule:
                         if short_reason and short_reason != "No preview available.":
                             st.caption(f"_{short_reason}_")
                     with right:
-                        local_time, day_shift = pkt_to_user(row['time'], user_tz_offset)
-                        adjusted_date = row["date"] + pd.Timedelta(days=day_shift)
-                        date_display = adjusted_date.strftime("%b %d")
+                        local_dt = row["match_datetime"].astimezone(user_tz)
+                        local_time = local_dt.strftime("%H:%M")
+                        date_display = local_dt.strftime("%b %d")
                         if result_text and not live_match_data:
                             s1 = str(row['score_team1']).split('.')[0]
                             s2 = str(row['score_team2']).split('.')[0]
