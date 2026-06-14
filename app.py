@@ -1413,14 +1413,14 @@ with tab_schedule:
     schedule_df = df.copy()
 
     # Apply view mode filter
+    def is_played(val):
+        s = str(val).strip() if pd.notna(val) else ""
+        return s != "" and s.lower() not in ["nan", "0", "tbd"]
+
     if view_mode == "Upcoming":
-        schedule_df = schedule_df[
-            schedule_df["winner"].fillna("").astype(str).str.strip().isin(["", "nan", "0", "TBD"])
-        ]
+        schedule_df = schedule_df[~schedule_df["winner"].apply(is_played)]
     elif view_mode == "Results":
-        schedule_df = schedule_df[
-            ~schedule_df["winner"].fillna("").astype(str).str.strip().isin(["", "nan", "0", "TBD"])
-        ]
+        schedule_df = schedule_df[schedule_df["winner"].apply(is_played)]
 
     # Apply sidebar filters
     if schedule_team != "All Teams":
