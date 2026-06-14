@@ -1398,11 +1398,29 @@ if "standings" in active_tabs:
                         st.markdown(group_html, unsafe_allow_html=True)
 
 # ── Schedule Tab ──────────────────────────────────────────────────────────────
-# ── Schedule Tab ──────────────────────────────────────────────────────────────
 with tab_schedule:
     st.info("Use the filters in the sidebar to control which matches appear.")
 
+    # ── View toggle ──────────────────────────────────────────────
+    view_mode = st.radio(
+        "Show",
+        ["Upcoming", "Results", "All"],
+        index=0,
+        horizontal=True,
+        key="schedule_view_mode"
+    )
+
     schedule_df = df.copy()
+
+    # Apply view mode filter
+    if view_mode == "Upcoming":
+        schedule_df = schedule_df[
+            schedule_df["winner"].fillna("").astype(str).str.strip().isin(["", "nan", "0", "TBD"])
+        ]
+    elif view_mode == "Results":
+        schedule_df = schedule_df[
+            ~schedule_df["winner"].fillna("").astype(str).str.strip().isin(["", "nan", "0", "TBD"])
+        ]
 
     # Apply sidebar filters
     if schedule_team != "All Teams":
