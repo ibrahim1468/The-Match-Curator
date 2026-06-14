@@ -1532,3 +1532,5 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
+st.write(df.dtypes)
+st.write(df[df["date"].astype(str).str.contains("2026-06-12")][["date","time"]].head())
