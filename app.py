@@ -1536,4 +1536,5 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
-st.write(df[df["match_id"].isin([1,2])][["match_id","date","time","match_datetime"]])
+raw = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
+st.write(raw["date"].head(3).tolist())
