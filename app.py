@@ -994,8 +994,13 @@ with tz_col2:
 user_tz_offset = TIMEZONE_OPTIONS[selected_tz_label]
 USER_TZ_LABEL = selected_tz_label
 
-# ── Prepare Filters (Before Sidebar) ───────────────────────────────────────────
-# This makes variables available to the whole script
+def make_user_tz(offset):
+    h = int(offset)
+    m = int(round((offset - h) * 60))
+    return timezone(timedelta(hours=h, minutes=m))
+
+user_tz = make_user_tz(user_tz_offset)
+
 all_teams = sorted([t for t in df["team1"].unique() if t not in 
                    ["TBD","1A","1B","1C","1D","1E","1F","1G","1H",
                     "1I","1J","1K","1L","2A","2B","2C","2D","2E",
@@ -1434,13 +1439,6 @@ with tab_schedule:
 
     if schedule_stage != "All Stages":
         schedule_df = schedule_df[schedule_df["stage"] == schedule_stage]
-
-    def make_user_tz(offset):
-        h = int(offset)
-        m = int(round((offset - h) * 60))
-        return timezone(timedelta(hours=h, minutes=m))
-
-    user_tz = make_user_tz(user_tz_offset)
 
     schedule_df["local_date"] = schedule_df["match_datetime"].apply(
         lambda dt: dt.astimezone(user_tz).date()
