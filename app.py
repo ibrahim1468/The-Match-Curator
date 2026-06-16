@@ -55,8 +55,11 @@ def get_live_scores():
         for match in r.json().get("games", []):
             status = str(match.get("time_elapsed", "")).lower()
             # Only include matches currently in progress
-            if status not in ["1h", "2h", "ht", "et", "p", "live"]:
-                continue
+            LIVE_STATUSES = {"1h", "2h", "ht", "et", "p", "live", "1h", "fh", "sh", "inprogress", "in_progress"}
+
+            status = str(match.get("time_elapsed", "")).lower().strip()
+            if not status or status in ["", "ns", "ft", "aet", "pen", "postp", "canc", "tbd"]:
+                continue  # skip not-started or finished
 
             home = str(match.get("home_team_name_en", ""))
             away = str(match.get("away_team_name_en", ""))
