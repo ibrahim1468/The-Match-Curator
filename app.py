@@ -14,6 +14,7 @@ def get_wc_token():
             "https://worldcup26.ir/auth/authenticate",
             json={"email": EMAIL, "password": PASSWORD},
             timeout=5
+            verify = False
         )
         if r.status_code == 200:
             return r.json().get("token")
@@ -23,6 +24,7 @@ def get_wc_token():
             "https://worldcup26.ir/auth/register",
             json={"name": "MatchCurator", "email": EMAIL, "password": PASSWORD},
             timeout=5
+            verify = False
         )
         if r2.status_code == 200:
             return r2.json().get("token")
@@ -41,7 +43,8 @@ def get_live_scores():
         r = requests.get(
             "https://worldcup26.ir/get/games",
             headers=headers,
-            timeout=5
+            timeout=5,
+            verify=False  # Add this
         )
         if r.status_code != 200:
             return {}
@@ -1536,3 +1539,15 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
+
+import requests, urllib3
+urllib3.disable_warnings()
+
+token = get_wc_token.__wrapped__()  # bypass cache
+st.write("Token:", token)
+if token:
+    r = requests.get("https://worldcup26.ir/get/games",
+                     headers={"Authorization": f"Bearer {token}"},
+                     verify=False, timeout=5)
+    st.write("Status:", r.status_code)
+    st.write("Sample:", r.json().get("games", [])[:2])
