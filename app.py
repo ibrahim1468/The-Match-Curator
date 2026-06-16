@@ -13,7 +13,7 @@ def get_wc_token():
         r = requests.post(
             "https://worldcup26.ir/auth/authenticate",
             json={"email": EMAIL, "password": PASSWORD},
-            timeout=5
+            timeout=5,
             verify = False
         )
         if r.status_code == 200:
@@ -23,7 +23,7 @@ def get_wc_token():
         r2 = requests.post(
             "https://worldcup26.ir/auth/register",
             json={"name": "MatchCurator", "email": EMAIL, "password": PASSWORD},
-            timeout=5
+            timeout=5,
             verify = False
         )
         if r2.status_code == 200:
