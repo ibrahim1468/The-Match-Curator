@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 @st.cache_data(ttl=3600)
 def get_wc_token():
@@ -1539,15 +1541,3 @@ with tab_schedule:
                                 f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
                                 unsafe_allow_html=True
                             )
-
-import requests, urllib3
-urllib3.disable_warnings()
-
-token = get_wc_token.__wrapped__()  # bypass cache
-st.write("Token:", token)
-if token:
-    r = requests.get("https://worldcup26.ir/get/games",
-                     headers={"Authorization": f"Bearer {token}"},
-                     verify=False, timeout=5)
-    st.write("Status:", r.status_code)
-    st.write("Sample:", r.json().get("games", [])[:2])
