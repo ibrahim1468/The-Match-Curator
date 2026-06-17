@@ -818,11 +818,10 @@ st.markdown("""
 
 /* Header */
 .curator-header {
-    text-align: center;
     padding: 2.5rem 0 1.5rem 0;
-    border-bottom: 1px solid #222;
-    margin-bottom: 2rem;
+    margin-top: 1rem;
 }
+            
 .curator-title {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 4rem;
@@ -994,10 +993,9 @@ st.markdown("""
     flex: 1;
 }
 .sb-team-name {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #ffffff;
-    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    font-family: 'Bebas Neue', sans-serif;
 }
 .sb-score {
     font-family: 'Bebas Neue', sans-serif;
@@ -1098,6 +1096,15 @@ def make_user_tz(offset):
 
 user_tz = make_user_tz(user_tz_offset)
 
+def get_match_category(home, away):
+    row = df[
+        ((df["team1"] == home) & (df["team2"] == away)) |
+        ((df["team1"] == away) & (df["team2"] == home))
+    ]
+    if len(row) > 0:
+        return str(row.iloc[0]["category"])
+    return "TBD"
+
 def render_scoreboard_html():
     if PRE_TOURNAMENT:
         delta = TOURNAMENT_START - NOW
@@ -1117,6 +1124,17 @@ def render_scoreboard_html():
         live_matches = list(live_scores.values())
 
         def single_card(m, compact=False):
+            # ── ADD: look up category and build banner ──
+            cat = get_match_category(m["home"], m["away"])
+            cat_colors = CATEGORY_COLORS.get(cat, CATEGORY_COLORS["TBD"])
+            category_banner = (
+                f"<div style='background:{cat_colors['badge_bg']}; color:{cat_colors['badge_text']}; "
+                f"text-align:center; padding:0.4rem; border-radius:0 0 10px 10px; "
+                f"font-size:0.72rem; font-weight:700; letter-spacing:0.12em; "
+                f"text-transform:uppercase;'>{cat}</div>"
+            )
+            # ── END ADD ──
+
             grid_class = "sb-multi-grid " if compact else ""
             scorers_html = ""
             if not compact:
@@ -1150,6 +1168,7 @@ def render_scoreboard_html():
                 f"</div>"
                 f"</div>"
                 f"{scorers_html}"
+                f"{category_banner}"    # <-- ADD THIS LINE
                 f"</div>"
             )
 
@@ -1170,6 +1189,15 @@ def render_scoreboard_html():
         return "<div class='countdown-box'>🏆 <span class='countdown-highlight'>Tournament Complete</span></div>"
 
     next_match = upcoming.iloc[0]
+    st.session_state["scoreboard_match_id"] = int(next_match["match_id"])
+    cat = str(next_match.get("category", "TBD"))
+    colors = CATEGORY_COLORS.get(cat, CATEGORY_COLORS["TBD"])
+    category_banner = (
+        f"<div style='background:{colors['badge_bg']}; color:{colors['badge_text']}; "
+        f"text-align:center; padding:0.4rem; border-radius:0 0 10px 10px; "
+        f"font-size:0.72rem; font-weight:700; letter-spacing:0.12em; "
+        f"text-transform:uppercase;'>{cat}</div>"
+    )
     delta = next_match["match_datetime"] - NOW
     total_seconds = int(delta.total_seconds())
     hours = total_seconds // 3600
@@ -1202,6 +1230,7 @@ def render_scoreboard_html():
         f"</div>"
         f"<div class='sb-team'><span class='sb-team-name'>{t2}</span></div>"
         f"</div>"
+        f"{category_banner}"
         f"</div>"
         f"</div>"
     )
@@ -1470,6 +1499,10 @@ today_matches = df[
     (df["category"] != "TBD") &
     (df["category"].isin(selected_categories))
 ].copy()
+
+excluded_id = st.session_state.get("scoreboard_match_id", None)
+if excluded_id:
+    today_matches = today_matches[today_matches["match_id"] != excluded_id]
 
 # Sort by entertainment value
 cat_order = {"Must Watch": 0, "Worth Watching": 1, "Optional": 2, "Skip": 3}
