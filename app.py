@@ -1148,7 +1148,6 @@ def render_scoreboard_html():
                         f"<div class='sb-scorer-col right'>{a_scorers}</div>"
                         f"</div>"
                     )
-            group_txt = f"Group {m['group']}" if m["group"] else ""
             return (
                 f"<div class='sb-card'>"
                 f"<div class='sb-live-bar'>"
@@ -1161,7 +1160,6 @@ def render_scoreboard_html():
                 f"</div>"
                 f"<div class='sb-kickoff'>"
                 f"<span class='sb-score'>{m['home_score']} – {m['away_score']}</span>"
-                f"<span class='sb-score-meta'>{group_txt}</span>"
                 f"</div>"
                 f"<div class='sb-team'>"
                 f"<span class='sb-team-name'>{short_name(m['away'])}</span>"
