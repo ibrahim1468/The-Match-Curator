@@ -19,6 +19,34 @@ def get_session():
 # ====================== LIVE SCORES ======================
 LIVE_STATUSES = {"live", "inprogress", "in progress", "1h", "2h", "ht", "et", "p"}
 
+TEAM_SHORT = {
+    "Democratic Republic of the Congo": "DR Congo",
+    "United States": "USA",
+    "Korea Republic": "South Korea",
+    "Trinidad and Tobago": "T&T",
+    "Bosnia and Herzegovina": "Bosnia",
+    "North Macedonia": "N. Macedonia",
+}
+
+def short_name(name):
+    return TEAM_SHORT.get(name, name)
+
+MINUTE_LABELS = {
+    "live": "Live", "inprogress": "Live", "in progress": "Live",
+    "1h": "1st Half", "2h": "2nd Half", "ht": "HT", "et": "ET", "p": "Pens",
+}
+
+def parse_scorers(raw):
+    """Parse scorer string like '{"J. Quiñones 9\'","R. Jiménez 67\'"}' into a clean list."""
+    if not raw or raw == "null":
+        return []
+    try:
+        import re
+        names = re.findall(r'"([^"]+)"', str(raw))
+        return names
+    except:
+        return []
+
 @st.cache_data(ttl=45)   # Good TTL for live scores
 def get_live_scores():
     try:
@@ -910,75 +938,138 @@ st.markdown("""
     border-top: 1px solid #222;
     margin: 2.5rem 0;
 }
+/* ── Scoreboard ── */
+.sb-outer {
+    margin-top: 1.2rem;
+    font-family: 'Barlow', sans-serif;
+}
+.sb-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    display: inline-block;
+    width: 100%;
+}
+.sb-live-bar {
+    background: #c0392b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 4px 14px;
+}
+.sb-live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #fff;
+    animation: sbpulse 1.2s infinite;
+    flex-shrink: 0;
+}
+@keyframes sbpulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+.sb-live-text {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.sb-minute {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.75);
+}
+.sb-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    gap: 12px;
+}
+.sb-team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+}
+.sb-team-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #ffffff;
+    text-align: center;
+}
+.sb-score {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    color: #ffffff;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    text-align: center;
+}
+.sb-score-meta {
+    font-size: 0.72rem;
+    color: #666;
+    text-align: center;
+    margin-top: 2px;
+}
+.sb-scorers {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px 10px;
+    border-top: 1px solid #222;
+    padding-top: 8px;
+    margin-top: 0;
+    gap: 8px;
+}
+.sb-scorer-col {
+    font-size: 0.72rem;
+    color: #888;
+    line-height: 1.6;
+}
+.sb-scorer-col.right { text-align: right; }
+.sb-multi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.sb-multi-grid .sb-body { padding: 10px 14px; }
+.sb-multi-grid .sb-score { font-size: 1.7rem; }
+.sb-multi-grid .sb-team-name { font-size: 0.75rem; }
+.sb-next-bar {
+    background: #111;
+    border-bottom: 1px solid #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 14px;
+}
+.sb-next-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #888;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.sb-kickoff {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+}
+.sb-kickoff-time {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: #ffffff;
+    line-height: 1;
+}
+.sb-kickoff-sub {
+    font-size: 0.72rem;
+    color: #666;
+}
 </style>
-""", unsafe_allow_html=True)
-
-
-# ── Countdown helper ───────────────────────────────────────────────────────────
-def get_countdown():
-    if PRE_TOURNAMENT:
-        delta = TOURNAMENT_START - NOW
-        total_seconds = int(delta.total_seconds())
-        days = total_seconds // 86400
-        hours = (total_seconds % 86400) // 3600
-        return f"Tournament begins in <span class='countdown-highlight'>{days} days, {hours} hours</span>"
-    else:
-        live_scores = get_live_scores()
-
-        if live_scores:
-            live_matches = list(live_scores.values())
-            if len(live_matches) == 1:
-                m = live_matches[0]
-                minute = str(m["minute"]).strip("'\"")
-                return (
-                    f"🔴 <span class='countdown-highlight'>Live Now:</span> "
-                    f"{m['home']} {m['home_score']} vs {m['away']} {m['away_score']} "
-                    f"<span class='countdown-highlight'>{minute}'</span>"
-                )
-            else:
-                # Multiple live matches — show all on one line
-                parts = []
-                for m in live_matches:
-                    minute = str(m["minute"]).strip("'\"")
-                    parts.append(f"{m['home']} {m['home_score']} vs {m['away']} {m['away_score']} {minute}'")
-                return f"🔴 <span class='countdown-highlight'>Live Now:</span> " + " &nbsp;|&nbsp; ".join(parts)
-
-        # No live match — find next upcoming
-        upcoming = df[
-            (df["match_datetime"] > NOW) &
-            (df["winner"].fillna("") == "") &
-            (df["category"] != "TBD")
-        ].sort_values("match_datetime")
-
-        if len(upcoming) == 0:
-            return "🏆 <span class='countdown-highlight'>Tournament Complete</span>"
-
-        next_match = upcoming.iloc[0]
-        delta = next_match["match_datetime"] - NOW
-        total_seconds = int(delta.total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-
-        if hours == 0:
-            time_str = f"{minutes}m"
-        elif hours < 24:
-            time_str = f"{hours}h {minutes}m"
-        else:
-            days = hours // 24
-            time_str = f"{days} days"
-
-        return (
-            f"Next: <span class='countdown-highlight'>{next_match['match']}</span> "
-            f"· in {time_str}"
-        )
-
-# ── Header ─────────────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div class='curator-header'>
-    <p class='curator-title'>The Match Curator</p>
-    <p class='curator-subtitle'>Your FIFA World Cup 2026 Watching Guide</p>
-    <div class='countdown-box'>{get_countdown()}</div>
-</div>
 """, unsafe_allow_html=True)
 
 # ── Timezone selector on main page ────────────────────────────────────────────
@@ -1006,6 +1097,123 @@ def make_user_tz(offset):
     return timezone(timedelta(hours=h, minutes=m))
 
 user_tz = make_user_tz(user_tz_offset)
+
+def render_scoreboard_html():
+    if PRE_TOURNAMENT:
+        delta = TOURNAMENT_START - NOW
+        total_seconds = int(delta.total_seconds())
+        days = total_seconds // 86400
+        hours = (total_seconds % 86400) // 3600
+        return (
+            f"<div class='countdown-box'>"
+            f"Tournament begins in <span class='countdown-highlight'>"
+            f"{days} days, {hours} hours</span></div>"
+        )
+
+    live_scores = get_live_scores()
+
+    # ── LIVE matches ───────────────────────────────────────────────
+    if live_scores:
+        live_matches = list(live_scores.values())
+
+        def single_card(m, compact=False):
+            grid_class = "sb-multi-grid " if compact else ""
+            scorers_html = ""
+            if not compact:
+                h_scorers = " · ".join(m["home_scorers"]) if m["home_scorers"] else ""
+                a_scorers = " · ".join(m["away_scorers"]) if m["away_scorers"] else ""
+                if h_scorers or a_scorers:
+                    scorers_html = (
+                        f"<div class='sb-scorers'>"
+                        f"<div class='sb-scorer-col'>{h_scorers}</div>"
+                        f"<div class='sb-scorer-col right'>{a_scorers}</div>"
+                        f"</div>"
+                    )
+            group_txt = f"Group {m['group']}" if m["group"] else ""
+            return (
+                f"<div class='sb-card'>"
+                f"<div class='sb-live-bar'>"
+                f"<div class='sb-live-dot'></div>"
+                f"<span class='sb-live-text'>Live</span>"
+                f"<span class='sb-minute'>&nbsp;{m['minute']}</span>"
+                f"</div>"
+                f"<div class='sb-body'>"
+                f"<div class='sb-team'>"
+                f"<span class='sb-team-name'>{short_name(m['home'])}</span>"
+                f"</div>"
+                f"<div class='sb-kickoff'>"
+                f"<span class='sb-score'>{m['home_score']} – {m['away_score']}</span>"
+                f"<span class='sb-score-meta'>{group_txt}</span>"
+                f"</div>"
+                f"<div class='sb-team'>"
+                f"<span class='sb-team-name'>{short_name(m['away'])}</span>"
+                f"</div>"
+                f"</div>"
+                f"{scorers_html}"
+                f"</div>"
+            )
+
+        if len(live_matches) == 1:
+            return f"<div class='sb-outer'>{single_card(live_matches[0])}</div>"
+        else:
+            cards = "".join(single_card(m, compact=True) for m in live_matches)
+            return f"<div class='sb-outer'><div class='sb-multi-grid'>{cards}</div></div>"
+
+    # ── No live match — show next upcoming ─────────────────────────
+    upcoming = df[
+        (df["match_datetime"] > NOW) &
+        (df["winner"].fillna("") == "") &
+        (df["category"] != "TBD")
+    ].sort_values("match_datetime")
+
+    if len(upcoming) == 0:
+        return "<div class='countdown-box'>🏆 <span class='countdown-highlight'>Tournament Complete</span></div>"
+
+    next_match = upcoming.iloc[0]
+    delta = next_match["match_datetime"] - NOW
+    total_seconds = int(delta.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+
+    if hours == 0:
+        time_str = f"{minutes}m"
+    elif hours < 24:
+        time_str = f"{hours}h {minutes}m"
+    else:
+        days = hours // 24
+        time_str = f"{days}d"
+
+    local_dt = next_match["match_datetime"].astimezone(user_tz)
+    kickoff_time = local_dt.strftime("%H:%M")
+    t1 = short_name(str(next_match["team1"]))
+    t2 = short_name(str(next_match["team2"]))
+
+    return (
+        f"<div class='sb-outer'>"
+        f"<div class='sb-card'>"
+        f"<div class='sb-next-bar'>"
+        f"⏱ <span class='sb-next-label'>Next match · in {time_str}</span>"
+        f"</div>"
+        f"<div class='sb-body'>"
+        f"<div class='sb-team'><span class='sb-team-name'>{t1}</span></div>"
+        f"<div class='sb-kickoff'>"
+        f"<span class='sb-kickoff-time'>{kickoff_time}</span>"
+        f"<span class='sb-kickoff-sub'>{USER_TZ_LABEL}</span>"
+        f"</div>"
+        f"<div class='sb-team'><span class='sb-team-name'>{t2}</span></div>"
+        f"</div>"
+        f"</div>"
+        f"</div>"
+    )
+
+# ── Header ────────────────────────────────────────────────────────
+st.markdown(f"""
+<div class='curator-header'>
+    <p class='curator-title'>The Match Curator</p>
+    <p class='curator-subtitle'>Your FIFA World Cup 2026 Watching Guide</p>
+    {render_scoreboard_html()}
+</div>
+""", unsafe_allow_html=True)
 
 all_teams = sorted([t for t in df["team1"].unique() if t not in 
                    ["TBD","1A","1B","1C","1D","1E","1F","1G","1H",
