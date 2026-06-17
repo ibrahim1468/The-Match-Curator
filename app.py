@@ -1139,8 +1139,8 @@ def render_scoreboard_html():
             grid_class = "sb-multi-grid " if compact else ""
             scorers_html = ""
             if not compact:
-                h_scorers = " · ".join(m["home_scorers"]) if m["home_scorers"] else ""
-                a_scorers = " · ".join(m["away_scorers"]) if m["away_scorers"] else ""
+                h_scorers = "<br>".join(m["home_scorers"]) if m["home_scorers"] else ""
+                a_scorers = "<br>".join(m["away_scorers"]) if m["away_scorers"] else ""
                 if h_scorers or a_scorers:
                     scorers_html = (
                         f"<div class='sb-scorers'>"
@@ -1153,8 +1153,7 @@ def render_scoreboard_html():
                 f"<div class='sb-card'>"
                 f"<div class='sb-live-bar'>"
                 f"<div class='sb-live-dot'></div>"
-                f"<span class='sb-live-text'>Live</span>"
-                f"<span class='sb-minute'>&nbsp;{m['minute']}</span>"
+                f"<span class='sb-live-text'>{MINUTE_LABELS.get(m['status'], 'Live')}</span>"
                 f"</div>"
                 f"<div class='sb-body'>"
                 f"<div class='sb-team'>"
