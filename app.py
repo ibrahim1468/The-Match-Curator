@@ -1133,14 +1133,12 @@ def render_scoreboard_html():
         live_matches = list(live_scores.values())
 
         def single_card(m, compact=False):
-            # no category banner for live matches
-            # ── END ADD ──
 
             grid_class = "sb-multi-grid " if compact else ""
             scorers_html = ""
             if not compact:
-                h_scorers = " · ".join(m["home_scorers"]) if m["home_scorers"] else ""
-                a_scorers = " · ".join(m["away_scorers"]) if m["away_scorers"] else ""
+                h_scorers = "<br>".join(m["home_scorers"]) if m["home_scorers"] else ""
+                a_scorers = "<br>".join(m["away_scorers"]) if m["away_scorers"] else ""
                 if h_scorers or a_scorers:
                     scorers_html = (
                         f"<div class='sb-scorers'>"
@@ -1148,13 +1146,12 @@ def render_scoreboard_html():
                         f"<div class='sb-scorer-col right'>{a_scorers}</div>"
                         f"</div>"
                     )
-            group_txt = f"Group {m['group']}" if m["group"] else ""
+                    
             return (
                 f"<div class='sb-card'>"
                 f"<div class='sb-live-bar'>"
                 f"<div class='sb-live-dot'></div>"
-                f"<span class='sb-live-text'>Live</span>"
-                f"<span class='sb-minute'>&nbsp;{m['minute']}</span>"
+                f"<span class='sb-live-text'>{MINUTE_LABELS.get(m['status'], 'Live')}</span>"
                 f"</div>"
                 f"<div class='sb-body'>"
                 f"<div class='sb-team'>"
@@ -1162,7 +1159,6 @@ def render_scoreboard_html():
                 f"</div>"
                 f"<div class='sb-kickoff'>"
                 f"<span class='sb-score'>{m['home_score']} – {m['away_score']}</span>"
-                f"<span class='sb-score-meta'>{group_txt}</span>"
                 f"</div>"
                 f"<div class='sb-team'>"
                 f"<span class='sb-team-name'>{short_name(m['away'])}</span>"
@@ -1177,6 +1173,7 @@ def render_scoreboard_html():
         else:
             cards = "".join(single_card(m, compact=True) for m in live_matches)
             return f"<div class='sb-outer'><div class='sb-multi-grid'>{cards}</div></div>"
+
 
     # ── No live match — show next upcoming ─────────────────────────
     upcoming = df[
