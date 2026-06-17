@@ -1503,15 +1503,37 @@ if POST_TOURNAMENT:
     st.stop()
 
 today_matches = df[
-    (df["match_datetime"] >= now_pkt - timedelta(hours=2)) &
+    (df["match_datetime"] > NOW) &           # strictly future only
     (df["match_datetime"] <= next_24h) &
     (df["category"] != "TBD") &
-    (df["category"].isin(selected_categories))
+    (df["category"].isin(selected_categories)) &
+    (df["winner"].fillna("") == "")          # not already finished
 ].copy()
 
+# Also exclude any currently live matches
+live_scores = get_live_scores()
+if live_scores:
+    live_keys = set(live_scores.keys())
+    def is_live_match(row):
+        k1 = f"{row['team1']} vs {row['team2']}"
+        k2 = f"{row['team2']} vs {row['team1']}"
+        return k1 in live_keys or k2 in live_keys
+    today_matches = today_matches[~today_matches.apply(is_live_match, axis=1)]
+
+# Exclude next-match scoreboard card
 excluded_id = st.session_state.get("scoreboard_match_id", None)
 if excluded_id:
     today_matches = today_matches[today_matches["match_id"] != excluded_id]
+
+# Exclude any currently live matches from the 24h cards
+live_scores = get_live_scores()
+if live_scores:
+    live_keys = set(live_scores.keys())
+    def is_live_match(row):
+        k1 = f"{row['team1']} vs {row['team2']}"
+        k2 = f"{row['team2']} vs {row['team1']}"
+        return k1 in live_keys or k2 in live_keys
+    today_matches = today_matches[~today_matches.apply(is_live_match, axis=1)]
 
 # Sort by entertainment value
 cat_order = {"Must Watch": 0, "Worth Watching": 1, "Optional": 2, "Skip": 3}
