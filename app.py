@@ -1133,15 +1133,7 @@ def render_scoreboard_html():
         live_matches = list(live_scores.values())
 
         def single_card(m, compact=False):
-            # ── ADD: look up category and build banner ──
-            cat = get_match_category(m["home"], m["away"])
-            cat_colors = CATEGORY_COLORS.get(cat, CATEGORY_COLORS["TBD"])
-            category_banner = (
-                f"<div style='background:{cat_colors['badge_bg']}; color:{cat_colors['badge_text']}; "
-                f"text-align:center; padding:0.4rem; border-radius:0 0 10px 10px; "
-                f"font-size:0.72rem; font-weight:700; letter-spacing:0.12em; "
-                f"text-transform:uppercase;'>{cat}</div>"
-            )
+            # no category banner for live matches
             # ── END ADD ──
 
             grid_class = "sb-multi-grid " if compact else ""
@@ -1177,7 +1169,6 @@ def render_scoreboard_html():
                 f"</div>"
                 f"</div>"
                 f"{scorers_html}"
-                f"{category_banner}"    # <-- ADD THIS LINE
                 f"</div>"
             )
 
