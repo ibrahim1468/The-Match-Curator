@@ -1133,8 +1133,6 @@ def render_scoreboard_html():
         live_matches = list(live_scores.values())
 
         def single_card(m, compact=False):
-            # no category banner for live matches
-            # ── END ADD ──
 
             grid_class = "sb-multi-grid " if compact else ""
             scorers_html = ""
@@ -1148,6 +1146,7 @@ def render_scoreboard_html():
                         f"<div class='sb-scorer-col right'>{a_scorers}</div>"
                         f"</div>"
                     )
+                    
             return (
                 f"<div class='sb-card'>"
                 f"<div class='sb-live-bar'>"
@@ -1174,6 +1173,7 @@ def render_scoreboard_html():
         else:
             cards = "".join(single_card(m, compact=True) for m in live_matches)
             return f"<div class='sb-outer'><div class='sb-multi-grid'>{cards}</div></div>"
+
 
     # ── No live match — show next upcoming ─────────────────────────
     upcoming = df[
