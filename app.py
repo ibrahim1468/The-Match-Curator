@@ -1,73 +1,56 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timezone, timedelta
-import requests
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import httpx
 
-@st.cache_data(ttl=3600)
-def get_wc_token():
-    try:
-        EMAIL = "matchcurator_prod_v1@noreply.com"
-        PASSWORD = "SecurePass123!"
+# ====================== SESSION ======================
+def get_session():
+    return httpx.Client(
+        verify=False,
+        timeout=httpx.Timeout(20.0, connect=10.0),
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Connection": "close"
+        },
+        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+    )
 
-        # Try login first
-        r = requests.post(
-            "https://worldcup26.ir/auth/authenticate",
-            json={"email": EMAIL, "password": PASSWORD},
-            timeout=5,
-            verify = False
-        )
-        if r.status_code == 200:
-            return r.json().get("token")
 
-        # If login fails, try registering
-        r2 = requests.post(
-            "https://worldcup26.ir/auth/register",
-            json={"name": "MatchCurator", "email": EMAIL, "password": PASSWORD},
-            timeout=5,
-            verify = False
-        )
-        if r2.status_code == 200:
-            return r2.json().get("token")
-    except:
-        pass
-    return None
+# ====================== LIVE SCORES ======================
+LIVE_STATUSES = {"live", "inprogress", "in progress", "1h", "2h", "ht", "et", "p"}
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=45)   # Good TTL for live scores
 def get_live_scores():
     try:
-        token = get_wc_token()
-        if not token:
-            return {}
+        with get_session() as client:
+            r = client.get(
+                "https://worldcup26.ir/get/games",
+                timeout=httpx.Timeout(25.0, connect=10.0)
+            )
+            
+            print(f"Games API status: {r.status_code}")
 
-        headers = {"Authorization": f"Bearer {token}"}
-        r = requests.get(
-            "https://worldcup26.ir/get/games",
-            headers=headers,
-            timeout=5,
-            verify=False  # Add this
-        )
-        if r.status_code != 200:
-            return {}
+            if r.status_code != 200:
+                print(f"Failed: {r.text[:150]}")
+                return {}
 
-        live = {}
-        for match in r.json().get("games", []):
-            status = str(match.get("time_elapsed", "")).lower()
-            # Only include matches currently in progress
-            LIVE_STATUSES = {"1h", "2h", "ht", "et", "p", "live", "1h", "fh", "sh", "inprogress", "in_progress"}
+            live = {}
+            for match in r.json().get("games", []):
+                status = str(match.get("time_elapsed", "")).lower().strip()
+                
+                if status not in LIVE_STATUSES:
+                    continue
 
-            status = str(match.get("time_elapsed", "")).lower().strip()
-            if not status or status in ["", "ns", "ft", "aet", "pen", "postp", "canc", "tbd"]:
-                continue  # skip not-started or finished
+                home = str(match.get("home_team_name_en", "")).strip()
+                away = str(match.get("away_team_name_en", "")).strip()
+                
+                if not (home and away):
+                    continue
+                    
+                home_score = int(match.get("home_score") or 0)
+                away_score = int(match.get("away_score") or 0)
+                minute = str(match.get("time_elapsed", ""))
 
-            home = str(match.get("home_team_name_en", ""))
-            away = str(match.get("away_team_name_en", ""))
-            home_score = match.get("home_score", 0) or 0
-            away_score = match.get("away_score", 0) or 0
-            minute = match.get("time_elapsed", "")
-
-            if home and away:
                 live[f"{home} vs {away}"] = {
                     "home": home,
                     "away": away,
@@ -76,10 +59,14 @@ def get_live_scores():
                     "minute": minute,
                     "status": status
                 }
-        return live
-    except:
+            
+            print(f"✅ Found {len(live)} live matches")
+            return live
+
+    except Exception as e:
+        print(f"Live scores error: {e}")
         return {}
-    
+        
 st.set_page_config(
     page_title="The Match Curator",
     page_icon="⚽",
@@ -937,16 +924,24 @@ def get_countdown():
         return f"Tournament begins in <span class='countdown-highlight'>{days} days, {hours} hours</span>"
     else:
         live_scores = get_live_scores()
-        
-        # Check if any match is currently live
+
         if live_scores:
             live_matches = list(live_scores.values())
             if len(live_matches) == 1:
                 m = live_matches[0]
-                return (f"🔴 <span class='countdown-highlight'>LIVE NOW</span> · "
-                        f"{m['home']} {m['home_score']} — {m['away_score']} {m['away']}")
+                minute = str(m["minute"]).strip("'\"")
+                return (
+                    f"🔴 <span class='countdown-highlight'>Live Now:</span> "
+                    f"{m['home']} {m['home_score']} vs {m['away']} {m['away_score']} "
+                    f"<span class='countdown-highlight'>{minute}'</span>"
+                )
             else:
-                return f"🔴 <span class='countdown-highlight'>{len(live_matches)} matches LIVE NOW</span>"
+                # Multiple live matches — show all on one line
+                parts = []
+                for m in live_matches:
+                    minute = str(m["minute"]).strip("'\"")
+                    parts.append(f"{m['home']} {m['home_score']} vs {m['away']} {m['away_score']} {minute}'")
+                return f"🔴 <span class='countdown-highlight'>Live Now:</span> " + " &nbsp;|&nbsp; ".join(parts)
 
         # No live match — find next upcoming
         upcoming = df[
@@ -965,15 +960,18 @@ def get_countdown():
         minutes = (total_seconds % 3600) // 60
 
         if hours == 0:
-            time_str = f"{minutes} minutes"
+            time_str = f"{minutes}m"
         elif hours < 24:
             time_str = f"{hours}h {minutes}m"
         else:
             days = hours // 24
             time_str = f"{days} days"
 
-        return (f"Next: <span class='countdown-highlight'>{next_match['match']}</span> · "
-                f"in {time_str}")
+        return (
+            f"Next: <span class='countdown-highlight'>{next_match['match']}</span> "
+            f"· in {time_str}"
+        )
+
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class='curator-header'>
@@ -1202,7 +1200,6 @@ def render_card(row, favorite_team=None, rank=None):
         if s1 and s2:
             result_text = f"{s1}–{s2} · {'Draw' if winner == 'Draw' else winner + ' win'}"
 
-    # Pre-compute all variables
     rank_span = f"<span style='float:right; font-family:Barlow,sans-serif; font-size:0.85rem; color:#666;'>#{rank}</span>" if rank else ""
     flag1 = get_flag_b64(row["team1"])
     flag2 = get_flag_b64(row["team2"])
@@ -1217,39 +1214,20 @@ def render_card(row, favorite_team=None, rank=None):
     badge_bg = colors["badge_bg"]
     badge_text = colors["badge_text"]
 
-    # Render card
     card_style = f"background-color:{bg}; border-color:{border}; border-left:6px solid {border}; border-radius:12px; padding:1.5rem; margin-bottom:1.2rem; border-width:2px; border-style:solid; position:relative; font-family:Barlow,sans-serif;"
 
-    # Build single HTML string without multiline
     html = "<div style='" + card_style + "'>"
+
+    # Top-right corner: either ⭐ favorite, or ⏳ next match badge, or rank
     if is_favorite:
         html += "<div style='position:absolute; top:1rem; right:1rem; font-size:1.2rem;'>⭐</div>"
     html += "<span style='display:inline-block; padding:0.25rem 0.9rem; border-radius:20px; font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; background-color:" + badge_bg + "; color:" + badge_text + ";'>" + category + "</span>"
     html += rank_span
     html += "<div style='font-family:Bebas Neue,sans-serif; font-size:2rem; letter-spacing:0.08em; color:#111111; margin:0.3rem 0; line-height:1.1;'>" + flag1 + " " + team1 + " vs " + team2 + " " + flag2 + "</div>"
     html += "<div style='font-size:0.85rem; color:#444444; margin-top:0.4rem; font-weight:500;'>📅 " + date_str + " &nbsp;·&nbsp; 🕐 " + time_str + " " + USER_TZ_LABEL + " &nbsp;·&nbsp; 📍 " + venue + "</div>"
+
     if starts_in_text:
         html += "<div style='display:inline-block; margin-top:0.5rem; font-size:0.8rem; font-weight:600; color:#1a7a1a; background:rgba(0,150,0,0.08); padding:0.2rem 0.6rem; border-radius:4px;'>⏱ " + starts_in_text + "</div>"
-    # Live score check
-    if not PRE_TOURNAMENT:
-        live_scores = get_live_scores()
-        live_key = None
-        for key in live_scores:
-            ldata = live_scores[key]
-            if (team1.lower() in ldata["home"].lower() or team1.lower() in ldata["away"].lower()) and \
-               (team2.lower() in ldata["home"].lower() or team2.lower() in ldata["away"].lower()):
-                live_key = key
-                break
-        if live_key:
-            ld = live_scores[live_key]
-            minute_map = {"1h": "1st Half", "2h": "2nd Half", "ht": "Half Time", "et": "Extra Time", "p": "Penalties"}
-            minute_str = f" · {minute_map.get(ld['minute'], ld['minute'])}" if ld["minute"] else ""
-            html += (
-                f"<div style='margin-top:0.5rem; display:inline-block; "
-                f"background:#cc0000; color:#ffffff; font-size:0.8rem; font-weight:700; "
-                f"padding:0.25rem 0.7rem; border-radius:4px; letter-spacing:0.05em;'>"
-                f"🔴 LIVE{minute_str} &nbsp;|&nbsp; {ld['home_score']} — {ld['away_score']}</div>"
-            )
     if result_text:
         html += "<div style='margin-top:0.5rem; font-size:0.85rem; font-weight:600; color:#333;'>🏆 " + result_text + "</div>"
     html += "<div style='font-size:0.9rem; color:#333333; margin-top:0.8rem; line-height:1.5; border-top:1px solid rgba(0,0,0,0.1); padding-top:0.8rem;'>" + short_reason + "</div>"
@@ -1467,8 +1445,6 @@ with tab_schedule:
                 f"</span></p></div>",
                 unsafe_allow_html=True
             )
-            # Fetch live scores once per date group, not per row
-            live_scores = get_live_scores() if not PRE_TOURNAMENT else {}
 
             for _, row in date_group.iterrows():
                 category = str(row["category"])
@@ -1485,32 +1461,10 @@ with tab_schedule:
                     str(row["team1"]) == favorite_team or
                     str(row["team2"]) == favorite_team
                 )
-
-                # Check live score for this match
-                live_match_data = None
-                if live_scores:
-                    t1 = str(row["team1"]).lower()
-                    t2 = str(row["team2"]).lower()
-                    for key, ldata in live_scores.items():
-                        if (t1 in ldata["home"].lower() or t1 in ldata["away"].lower()) and \
-                        (t2 in ldata["home"].lower() or t2 in ldata["away"].lower()):
-                            live_match_data = ldata
-                            break
+                
                 with st.container():
                     left, right = st.columns([3, 1])
                     with left:
-                        if live_match_data:
-                            minute_map = {"1h": "1st Half", "2h": "2nd Half", "ht": "Half Time", "et": "Extra Time", "p": "Penalties"}
-                            minute_str = minute_map.get(live_match_data["minute"], live_match_data["minute"])
-                            st.markdown(
-                                f"<div style='display:inline-block; background:#cc0000; color:#ffffff; "
-                                f"font-size:0.8rem; font-weight:700; padding:0.25rem 0.7rem; "
-                                f"border-radius:4px; margin-top:0.3rem;'>"
-                                f"🔴 LIVE · {minute_str} &nbsp;|&nbsp; "
-                                f"{live_match_data['home_score']} — {live_match_data['away_score']}</div>",
-                                unsafe_allow_html=True
-                            )
-                        
                         st.markdown(
                             f"<span style='background:{colors['badge_bg']}; color:{colors['badge_text']}; "
                             f"padding:0.2rem 0.7rem; border-radius:20px; font-size:0.7rem; "
@@ -1531,7 +1485,7 @@ with tab_schedule:
                         local_dt = row["match_datetime"].astimezone(user_tz)
                         local_time = local_dt.strftime("%H:%M")
                         date_display = local_dt.strftime("%b %d")
-                        if result_text and not live_match_data:
+                        if result_text:
                             s1 = str(row['score_team1']).split('.')[0]
                             s2 = str(row['score_team2']).split('.')[0]
                             winner_name = str(row['winner'])
