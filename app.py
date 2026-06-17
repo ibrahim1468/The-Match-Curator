@@ -1,19 +1,33 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timezone, timedelta
-import httpx
+import requests
+import urllib3
+import ssl
+urllib3.disable_warnings()
 
 # ====================== SESSION ======================
+class TLSAdapter(requests.adapters.HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+        # OP_LEGACY_SERVER_CONNECT only exists in Python 3.12+
+        legacy = getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
+        ctx.options |= legacy
+        kwargs["ssl_context"] = ctx
+        super().init_poolmanager(*args, **kwargs)
+
 def get_session():
-    return httpx.Client(
-        verify=False,
-        timeout=httpx.Timeout(20.0, connect=10.0),
-        headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Connection": "close"
-        },
-        limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
-    )
+    session = requests.Session()
+    session.verify = False
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, */*",
+    })
+    session.mount("https://", TLSAdapter())
+    return session
 
 
 # ====================== LIVE SCORES ======================
@@ -37,7 +51,6 @@ MINUTE_LABELS = {
 }
 
 def parse_scorers(raw):
-    """Parse scorer string like '{"J. Quiñones 9\'","R. Jiménez 67\'"}' into a clean list."""
     if not raw or raw == "null":
         return []
     try:
@@ -47,15 +60,15 @@ def parse_scorers(raw):
     except:
         return []
 
-@st.cache_data(ttl=45)   # Good TTL for live scores
+@st.cache_data(ttl=45)
 def get_live_scores():
-    try:
-        with get_session() as client:
-            r = client.get(
+    for attempt in range(2):
+        try:
+            session = get_session()
+            r = session.get(
                 "https://worldcup26.ir/get/games",
-                timeout=httpx.Timeout(25.0, connect=10.0)
+                timeout=30
             )
-            
             print(f"Games API status: {r.status_code}")
 
             if r.status_code != 200:
@@ -65,35 +78,31 @@ def get_live_scores():
             live = {}
             for match in r.json().get("games", []):
                 status = str(match.get("time_elapsed", "")).lower().strip()
-                
                 if status not in LIVE_STATUSES:
                     continue
-
                 home = str(match.get("home_team_name_en", "")).strip()
                 away = str(match.get("away_team_name_en", "")).strip()
-                
                 if not (home and away):
                     continue
-                    
-                home_score = int(match.get("home_score") or 0)
-                away_score = int(match.get("away_score") or 0)
-                minute = str(match.get("time_elapsed", ""))
 
                 live[f"{home} vs {away}"] = {
                     "home": home,
                     "away": away,
-                    "home_score": home_score,
-                    "away_score": away_score,
-                    "minute": minute,
-                    "status": status
+                    "home_score": int(match.get("home_score") or 0),
+                    "away_score": int(match.get("away_score") or 0),
+                    "minute": str(match.get("time_elapsed", "")),
+                    "status": status,
+                    "group": str(match.get("group", "") or ""),
+                    "home_scorers": parse_scorers(match.get("home_scorers")),
+                    "away_scorers": parse_scorers(match.get("away_scorers")),
                 }
-            
+
             print(f"✅ Found {len(live)} live matches")
             return live
 
-    except Exception as e:
-        print(f"Live scores error: {e}")
-        return {}
+        except Exception as e:
+            print(f"Live scores error (attempt {attempt + 1}): {e}")
+    return {}
         
 st.set_page_config(
     page_title="The Match Curator",
