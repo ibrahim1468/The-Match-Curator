@@ -823,7 +823,7 @@ st.markdown("""
 .stMarkdown p { display: block; }
             
 .main { background-color: #0a0a0a; }
-.block-container { padding: 2rem 3rem; max-width: 1200px; margin: auto; }
+.block-container { padding: 4rem 3rem 2rem 3rem; max-width: 1200px; margin: auto; }
 
 /* Header */
 .curator-header {
@@ -1509,9 +1509,20 @@ today_matches = df[
     (df["category"].isin(selected_categories))
 ].copy()
 
+# Exclude the next-match scoreboard card
 excluded_id = st.session_state.get("scoreboard_match_id", None)
 if excluded_id:
     today_matches = today_matches[today_matches["match_id"] != excluded_id]
+
+# Exclude any currently live matches from the 24h cards
+live_scores = get_live_scores()
+if live_scores:
+    live_keys = set(live_scores.keys())  # e.g. {"England vs Croatia"}
+    def is_live_match(row):
+        k1 = f"{row['team1']} vs {row['team2']}"
+        k2 = f"{row['team2']} vs {row['team1']}"
+        return k1 in live_keys or k2 in live_keys
+    today_matches = today_matches[~today_matches.apply(is_live_match, axis=1)]
 
 # Sort by entertainment value
 cat_order = {"Must Watch": 0, "Worth Watching": 1, "Optional": 2, "Skip": 3}
