@@ -4,6 +4,8 @@ from datetime import datetime, timezone, timedelta
 import requests
 import urllib3
 import ssl
+from streamlit_autorefresh import st_autorefresh
+
 urllib3.disable_warnings()
 
 # ====================== SESSION ======================
@@ -110,6 +112,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+st_autorefresh(interval=30_000, limit=None, key="live_score_refresh")
 
 PKT = timezone(timedelta(hours=5))
 TOURNAMENT_START = datetime(2026, 6, 12, 0, 0, tzinfo=PKT)
