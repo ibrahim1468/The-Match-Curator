@@ -104,7 +104,7 @@ def get_live_scores():
 
         except Exception as e:
             print(f"Live scores error (attempt {attempt + 1}): {e}")
-    return {}
+    return {} 
         
 st.set_page_config(
     page_title="The Match Curator",
