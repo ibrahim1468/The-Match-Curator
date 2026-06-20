@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 import requests 
 import urllib3
 import ssl
-from streamlit_autorefresh import st_autorefresh
+from streamlit_autorefresh import st_autorefresh 
 
 urllib3.disable_warnings()
 
