@@ -4,7 +4,11 @@ from datetime import datetime, timezone, timedelta
 import requests 
 import urllib3
 import ssl
-from streamlit_autorefresh import st_autorefresh 
+from streamlit_autorefresh import st_autorefresh
+import streamlit.components.v1 as components
+
+if "screen_width" not in st.session_state:
+    st.session_state["screen_width"] = 1200
 
 urllib3.disable_warnings()
 
@@ -188,7 +192,14 @@ df["match_datetime"] = df.apply(get_match_datetime, axis=1)
 for _ in range(5):
     for col in ["team1", "team2"]:
         df[col] = df[col].apply(lambda x: resolve_team(x, df))
-    
+
+try:
+    screen_width = int(st.query_params.get("sw", 1200))
+except (ValueError, TypeError):
+    screen_width = 1200
+
+IS_MOBILE = screen_width < 768
+IS_TABLET = 768 <= screen_width < 1024
     
 TIMEZONE_OPTIONS = {
     'Africa/Abidjan': 0.0,
@@ -1118,8 +1129,40 @@ st.markdown("""
     font-size: 0.72rem;
     color: #666;
 }
+            
+
+@media (max-width: 767px) {
+    .block-container { padding: 1rem 1rem; }
+    .curator-title   { font-size: 2.5rem; }
+    .match-teams     { font-size: 1.4rem; }
+    .sb-team-name    { font-size: 1.4rem; }
+    .sb-score        { font-size: 1.6rem; }
+    .sb-multi-grid   { grid-template-columns: 1fr; }
+}
+@media (max-width: 1023px) and (min-width: 768px) {
+    .block-container { padding: 1.5rem 2rem; }
+    .curator-title   { font-size: 3rem; }
+}
+            
 </style>
 """, unsafe_allow_html=True)
+
+components.html("""
+<script>
+    (function() {
+        const w = window.innerWidth;
+        const url = new URL(window.parent.location.href);
+        
+        // Only update if not already set or stale
+        if (url.searchParams.get('sw') != w) {
+            url.searchParams.set('sw', w);
+            window.parent.history.replaceState({}, '', url);
+            // Trigger Streamlit rerun by dispatching storage event
+            window.parent.dispatchEvent(new Event('popstate'));
+        }
+    })();
+</script>
+""", height=0)
 
 # ── Timezone selector on main page ────────────────────────────────────────────
 tz_col1, tz_col2, tz_col3 = st.columns([1, 2, 1])
@@ -1169,6 +1212,7 @@ def render_scoreboard_html():
         )
 
     live_scores = get_live_scores()
+    flex_dir = "column" if IS_MOBILE else "row"
 
     # ── LIVE matches ───────────────────────────────────────────────
     if live_scores:
@@ -1195,7 +1239,7 @@ def render_scoreboard_html():
                 f"<div class='sb-live-dot'></div>"
                 f"<span class='sb-live-text'>{MINUTE_LABELS.get(m['status'], 'Live')}</span>"
                 f"</div>"
-                f"<div class='sb-body'>"
+                f"<div class='sb-body' style='flex-direction:{flex_dir};'>"
                 f"<div class='sb-team'>"
                 f"<span class='sb-team-name'>{short_name(m['home'])}</span>"
                 f"</div>"
@@ -1471,6 +1515,8 @@ def render_card(row, favorite_team=None, rank=None):
     category = str(row["category"])
     colors = CATEGORY_COLORS.get(category, CATEGORY_COLORS["TBD"])
     short_reason, extended_reason = parse_reason(row["reason"])
+    title_size = "1.4rem" if IS_MOBILE else "2rem"
+    meta_size  = "0.75rem" if IS_MOBILE else "0.85rem"
     is_favorite = favorite_team and (
         str(row["team1"]) == favorite_team or
         str(row["team2"]) == favorite_team
@@ -1511,8 +1557,8 @@ def render_card(row, favorite_team=None, rank=None):
     html += rank_span
     t1_display = display_team_name(team1)
     t2_display = display_team_name(team2)
-    html += "<div style='font-family:Bebas Neue,sans-serif; font-size:2rem; letter-spacing:0.08em; color:#111111; margin:0.3rem 0; line-height:1.1;'>" + flag1 + " " + t1_display + " vs " + t2_display + " " + flag2 + "</div>"
-    html += "<div style='font-size:0.85rem; color:#444444; margin-top:0.4rem; font-weight:500;'>📅 " + date_str + " &nbsp;·&nbsp; 🕐 " + time_str + " " + USER_TZ_LABEL + " &nbsp;·&nbsp; 📍 " + venue + "</div>"
+    html += f"<div style='font-family:Bebas Neue,sans-serif; font-size:{title_size}; letter-spacing:0.08em; color:#111111; margin:0.3rem 0; line-height:1.1;'>" + flag1 + " " + t1_display + " vs " + t2_display + " " + flag2 + "</div>"
+    html += f"<div style='font-size:{meta_size}; color:#444444; margin-top:0.4rem; font-weight:500;'>📅 " + date_str + " &nbsp;·&nbsp; 🕐 " + time_str + " " + USER_TZ_LABEL + " &nbsp;·&nbsp; 📍 " + venue + "</div>"
 
     if starts_in_text:
         html += "<div style='display:inline-block; margin-top:0.5rem; font-size:0.8rem; font-weight:600; color:#1a7a1a; background:rgba(0,150,0,0.08); padding:0.2rem 0.6rem; border-radius:4px;'>⏱ " + starts_in_text + "</div>"
@@ -1657,6 +1703,7 @@ if "standings" in active_tabs:
         else:
             standings = build_group_standings(df)
             groups = list(standings.keys())
+            cols_per_row = 1 if IS_MOBILE else 4
             rows = [groups[i:i+4] for i in range(0, len(groups), 4)]
             for group_row in rows:
                 cols = st.columns(len(group_row))
