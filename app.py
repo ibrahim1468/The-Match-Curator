@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 import requests 
 import urllib3
 import ssl
-from streamlit_autorefresh import st_autorefresh
+from streamlit_autorefresh import st_autorefresh 
 
 urllib3.disable_warnings()
 
@@ -128,6 +128,41 @@ now_pkt = NOW
 today = NOW.date()
 next_24h = now_pkt + timedelta(hours=24)
 
+def resolve_team(slot, df):
+    slot = str(slot).strip()
+    if not slot or slot in ["TBD", "nan"] or slot.startswith(" "):
+        return slot
+    
+    # Already a real team name — not a slot code
+    if not (slot.startswith("W") or slot.startswith("L") or 
+            (len(slot) == 2 and slot[0].isdigit())):
+        return slot
+    
+    if slot.startswith("W"):
+        try:
+            match_id = int(slot[1:])
+        except ValueError:
+            return slot
+        match_row = df[df["match_id"] == match_id]
+        if len(match_row) > 0:
+            winner = str(match_row.iloc[0]["winner"]).strip()
+            if winner and winner not in ["", "nan", "0", "TBD"]:
+                return winner
+
+    if slot.startswith("L"):
+        try:
+            match_id = int(slot[1:])
+        except ValueError:
+            return slot
+        match_row = df[df["match_id"] == match_id]
+        if len(match_row) > 0:
+            row = match_row.iloc[0]
+            winner = str(row["winner"]).strip()
+            if winner and winner not in ["", "nan", "0", "TBD", "Draw"]:
+                return row["team1"] if winner == str(row["team2"]) else row["team2"]
+
+    return slot  # unresolved — keep slot code for now
+
 @st.cache_data(ttl=60)
 def load_data():
     df = pd.read_csv("data/final/FIFA_WC_2026_data.csv")
@@ -135,7 +170,6 @@ def load_data():
     return df
 
 df = load_data()
-print(df[df["match_id"].isin([1,2])][["match_id","date","time","category"]].to_string())
 
 def get_match_datetime(row):
     try:
@@ -151,7 +185,11 @@ def get_match_datetime(row):
                        row["date"].day, 0, 0, tzinfo=PKT)
 
 df["match_datetime"] = df.apply(get_match_datetime, axis=1)
-# ── Timezone detection ─────────────────────────────────────────────────────────
+for _ in range(5):
+    for col in ["team1", "team2"]:
+        df[col] = df[col].apply(lambda x: resolve_team(x, df))
+    
+    
 TIMEZONE_OPTIONS = {
     'Africa/Abidjan': 0.0,
     'Africa/Accra': 0.0,
@@ -1245,11 +1283,13 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-all_teams = sorted([t for t in df["team1"].unique() if t not in 
-                   ["TBD","1A","1B","1C","1D","1E","1F","1G","1H",
-                    "1I","1J","1K","1L","2A","2B","2C","2D","2E",
-                    "2F","2G","2H","2I","2J","2K","2L"] and 
-                    not str(t).startswith(("3","W","L"))])
+_all_team_names = set(df["team1"].unique()) | set(df["team2"].unique())
+_slot_prefixes = ("W", "L", "1A","1B","1C","1D","1E","1F","1G","1H",
+                  "1I","1J","1K","1L","2A","2B","2C","2D","2E",
+                  "2F","2G","2H","2I","2J","2K","2L","3","TBD")
+all_teams = sorted([t for t in _all_team_names 
+                    if not str(t).startswith(_slot_prefixes) 
+                    and str(t) not in ["TBD", "nan", ""]])
 
 # Default values
 favorite_team = None
@@ -1418,6 +1458,14 @@ def get_starts_in(match_date, match_time):
     except:
         return "", False
 
+def display_team_name(name):
+    """Show slot codes in a styled way if not yet resolved."""
+    name = str(name).strip()
+    if name.startswith("W"):
+        return f"<span style='color:#888; font-style:italic;'>Winner M{name[1:]}</span>"
+    if name.startswith("L"):
+        return f"<span style='color:#888; font-style:italic;'>Runner-up M{name[1:]}</span>"
+    return name
 
 def render_card(row, favorite_team=None, rank=None):
     category = str(row["category"])
@@ -1439,8 +1487,8 @@ def render_card(row, favorite_team=None, rank=None):
             result_text = f"{s1}–{s2} · {'Draw' if winner == 'Draw' else winner + ' win'}"
 
     rank_span = f"<span style='float:right; font-family:Barlow,sans-serif; font-size:0.85rem; color:#666;'>#{rank}</span>" if rank else ""
-    flag1 = get_flag_b64(row["team1"])
-    flag2 = get_flag_b64(row["team2"])
+    flag1 = get_flag_b64(row["team1"]) if not str(row["team1"]).startswith(("W","L")) else ""
+    flag2 = get_flag_b64(row["team2"]) if not str(row["team2"]).startswith(("W","L")) else ""
     team1 = str(row["team1"])
     team2 = str(row["team2"])
     local_dt = row["match_datetime"].astimezone(user_tz)
@@ -1461,7 +1509,9 @@ def render_card(row, favorite_team=None, rank=None):
         html += "<div style='position:absolute; top:1rem; right:1rem; font-size:1.2rem;'>⭐</div>"
     html += "<span style='display:inline-block; padding:0.25rem 0.9rem; border-radius:20px; font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; background-color:" + badge_bg + "; color:" + badge_text + ";'>" + category + "</span>"
     html += rank_span
-    html += "<div style='font-family:Bebas Neue,sans-serif; font-size:2rem; letter-spacing:0.08em; color:#111111; margin:0.3rem 0; line-height:1.1;'>" + flag1 + " " + team1 + " vs " + team2 + " " + flag2 + "</div>"
+    t1_display = display_team_name(team1)
+    t2_display = display_team_name(team2)
+    html += "<div style='font-family:Bebas Neue,sans-serif; font-size:2rem; letter-spacing:0.08em; color:#111111; margin:0.3rem 0; line-height:1.1;'>" + flag1 + " " + t1_display + " vs " + t2_display + " " + flag2 + "</div>"
     html += "<div style='font-size:0.85rem; color:#444444; margin-top:0.4rem; font-weight:500;'>📅 " + date_str + " &nbsp;·&nbsp; 🕐 " + time_str + " " + USER_TZ_LABEL + " &nbsp;·&nbsp; 📍 " + venue + "</div>"
 
     if starts_in_text:
@@ -1685,7 +1735,12 @@ with tab_schedule:
         ]
 
     if selected_categories:
-        schedule_df = schedule_df[schedule_df["category"].isin(selected_categories)]
+        knockout_mask = schedule_df["stage"].str.lower().isin(
+            ["round of 32", "round of 16", "quarter-final", "semi-final", "play-off for third place", "final"]
+        )
+        schedule_df = schedule_df[
+            knockout_mask | schedule_df["category"].isin(selected_categories)
+        ]
 
     if schedule_stage != "All Stages":
         schedule_df = schedule_df[schedule_df["stage"] == schedule_stage]
@@ -1697,68 +1752,132 @@ with tab_schedule:
     if len(schedule_df) == 0:
         st.markdown("<p style='font-family:Barlow,sans-serif; color:#888; text-align:center; padding:2rem;'>No matches found with current filters.</p>", unsafe_allow_html=True)
     else:
-        for match_date, date_group in schedule_df.groupby("local_date", sort=True):
-            date_label = pd.Timestamp(match_date).strftime("%A, %B %d")
-            match_count = len(date_group)
-            st.markdown(
-                f"<div style='margin:1.5rem 0 0.8rem 0;'><p style='font-family:Bebas Neue,sans-serif; "
-                f"font-size:1.3rem; color:#ffffff; letter-spacing:0.08em; margin:0; "
-                f"border-left:3px solid #444; padding-left:0.7rem;'>{date_label} "
-                f"<span style='font-family:Barlow,sans-serif; font-size:0.8rem; color:#666; "
-                f"font-weight:400; margin-left:0.8rem;'>{match_count} match{'es' if match_count > 1 else ''}"
-                f"</span></p></div>",
-                unsafe_allow_html=True
+        def render_schedule_row(row):
+            category = str(row["category"])
+            colors = CATEGORY_COLORS.get(category, CATEGORY_COLORS["TBD"])
+            short_reason, _ = parse_reason(row["reason"])
+            winner = str(row["winner"]) if pd.notna(row["winner"]) and str(row["winner"]) != "" else ""
+            result_text = ""
+            if winner:
+                s1 = str(row["score_team1"]) if pd.notna(row["score_team1"]) else ""
+                s2 = str(row["score_team2"]) if pd.notna(row["score_team2"]) else ""
+                if s1 and s2:
+                    result_text = f"{s1}–{s2} · {winner} win"
+            is_fav = favorite_team and (
+                str(row["team1"]) == favorite_team or
+                str(row["team2"]) == favorite_team
             )
 
-            for _, row in date_group.iterrows():
-                category = str(row["category"])
-                colors = CATEGORY_COLORS.get(category, CATEGORY_COLORS["TBD"])
-                short_reason, _ = parse_reason(row["reason"])
-                winner = str(row["winner"]) if pd.notna(row["winner"]) and str(row["winner"]) != "" else ""
-                result_text = ""
-                if winner:
-                    s1 = str(row["score_team1"]) if pd.notna(row["score_team1"]) else ""
-                    s2 = str(row["score_team2"]) if pd.notna(row["score_team2"]) else ""
-                    if s1 and s2:
-                        result_text = f"{s1}–{s2} · {winner} win"
-                is_fav = favorite_team and (
-                    str(row["team1"]) == favorite_team or
-                    str(row["team2"]) == favorite_team
+            t1 = str(row["team1"])
+            t2 = str(row["team2"])
+
+            # Display slot codes nicely if not yet resolved
+            def slot_display(name):
+                if name.startswith("W"):
+                    return f"<span style='color:#888; font-style:italic;'>Winner M{name[1:]}</span>"
+                if name.startswith("L"):
+                    return f"<span style='color:#888; font-style:italic;'>Runner-up M{name[1:]}</span>"
+                return name
+
+            flag1 = get_flag_b64(t1) if not t1.startswith(("W", "L", "1", "2", "3")) else ""
+            flag2 = get_flag_b64(t2) if not t2.startswith(("W", "L", "1", "2", "3")) else ""
+            t1_display = slot_display(t1)
+            t2_display = slot_display(t2)
+
+            with st.container():
+                left, right = st.columns([3, 1])
+                with left:
+                    st.markdown(
+                        f"<span style='background:{colors['badge_bg']}; color:{colors['badge_text']}; "
+                        f"padding:0.2rem 0.7rem; border-radius:20px; font-size:0.7rem; "
+                        f"font-weight:700; letter-spacing:0.1em;'>{category}</span>"
+                        f"{'  ⭐' if is_fav else ''}",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown(
+                        f"<p style='font-family:Bebas Neue,sans-serif; font-size:1.3rem; "
+                        f"color:#ffffff; margin:0.2rem 0; letter-spacing:0.06em;'>"
+                        f"{flag1} {t1_display} vs {t2_display} {flag2}</p>",
+                        unsafe_allow_html=True
+                    )
+                    st.caption(f"📍 {row['venue']}  ·  {row['group'] if pd.notna(row['group']) else row['stage']}")
+                    if short_reason and short_reason != "No preview available.":
+                        st.caption(f"_{short_reason}_")
+                with right:
+                    local_dt = row["match_datetime"].astimezone(user_tz)
+                    date_display = local_dt.strftime("%b %d")
+                    if result_text:
+                        s1 = str(row["score_team1"]).split(".")[0]
+                        s2 = str(row["score_team2"]).split(".")[0]
+                        winner_name = str(row["winner"])
+                        result_label = "Draw" if winner_name == "Draw" else f"{winner_name} win"
+                        st.markdown(
+                            f"<p style='text-align:right; font-family:Barlow,sans-serif; "
+                            f"font-size:1rem; color:#f0c040; font-weight:700; margin:0;'>"
+                            f"{s1}–{s2}<br>"
+                            f"<span style='font-size:0.72rem; color:#f0c040; font-weight:500;'>{result_label}</span><br>"
+                            f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            f"<p style='text-align:right; font-family:Barlow,sans-serif; "
+                            f"font-size:1rem; color:#ffffff; font-weight:700; margin:0;'>"
+                            f"{local_dt.strftime('%H:%M')}<br>"
+                            f"<span style='font-size:0.72rem; color:#666;'>{date_display}</span></p>",
+                            unsafe_allow_html=True
+                        )
+
+        # ── Split into group stage vs knockouts ───────────────────────
+        GROUP_STAGE_VALUES   = ["group stage"]
+        KNOCKOUT_STAGE_VALUES = ["round of 32", "round of 16", "quarter-final", "semi-final", "play-off for third place", "final"]
+        STAGE_ORDER_MAP = {s: i for i, s in enumerate(KNOCKOUT_STAGE_VALUES)}
+
+        group_sched    = schedule_df[schedule_df["stage"].str.lower().isin(GROUP_STAGE_VALUES)]
+        knockout_sched = schedule_df[schedule_df["stage"].str.lower().isin(KNOCKOUT_STAGE_VALUES)]
+
+        if len(schedule_df) == 0:
+            st.markdown("<p style='font-family:Barlow,sans-serif; color:#888; text-align:center; padding:2rem;'>No matches found with current filters.</p>", unsafe_allow_html=True)
+
+        # ── Group Stage ───────────────────────────────────────────────
+        if len(group_sched) > 0:
+            for match_date, date_group in group_sched.groupby("local_date", sort=True):
+                date_label = pd.Timestamp(match_date).strftime("%A, %B %d")
+                match_count = len(date_group)
+                st.markdown(
+                    f"<div style='margin:1.5rem 0 0.8rem 0;'><p style='font-family:Bebas Neue,sans-serif; "
+                    f"font-size:1.3rem; color:#ffffff; letter-spacing:0.08em; margin:0; "
+                    f"border-left:3px solid #444; padding-left:0.7rem;'>{date_label} "
+                    f"<span style='font-family:Barlow,sans-serif; font-size:0.8rem; color:#666; "
+                    f"font-weight:400; margin-left:0.8rem;'>{match_count} match{'es' if match_count > 1 else ''}"
+                    f"</span></p></div>",
+                    unsafe_allow_html=True
                 )
-                
-                with st.container():
-                    left, right = st.columns([3, 1])
-                    with left:
-                        st.markdown(
-                            f"<span style='background:{colors['badge_bg']}; color:{colors['badge_text']}; "
-                            f"padding:0.2rem 0.7rem; border-radius:20px; font-size:0.7rem; "
-                            f"font-weight:700; letter-spacing:0.1em;'>{category}</span>"
-                            f"{'  ⭐' if is_fav else ''}",
-                            unsafe_allow_html=True
-                        )
-                        st.markdown(
-                            f"<p style='font-family:Bebas Neue,sans-serif; font-size:1.3rem; "
-                            f"color:#ffffff; margin:0.2rem 0; letter-spacing:0.06em;'>"
-                            f"{get_flag_b64(row['team1'])} {row['team1']} vs {row['team2']} {get_flag_b64(row['team2'])}</p>",
-                            unsafe_allow_html=True
-                        )
-                        st.caption(f"📍 {row['venue']}  ·  {row['group'] if pd.notna(row['group']) else row['stage']}")
-                        if short_reason and short_reason != "No preview available.":
-                            st.caption(f"_{short_reason}_")
-                    with right:
-                        local_dt = row["match_datetime"].astimezone(user_tz)
-                        local_time = local_dt.strftime("%H:%M")
-                        date_display = local_dt.strftime("%b %d")
-                        if result_text:
-                            s1 = str(row['score_team1']).split('.')[0]
-                            s2 = str(row['score_team2']).split('.')[0]
-                            winner_name = str(row['winner'])
-                            result_label = "Draw" if winner_name == "Draw" else f"{winner_name} win"
-                            st.markdown(
-                                f"<p style='text-align:right; font-family:Barlow,sans-serif; "
-                                f"font-size:1rem; color:#f0c040; font-weight:700; margin:0;'>"
-                                f"{s1}–{s2}<br>"
-                                f"<span style='font-size:0.72rem; color:#f0c040; font-weight:500;'>{result_label}</span><br>"
-                                f"<span style='font-size:0.72rem; color:#666; font-weight:400;'>{date_display}</span></p>",
-                                unsafe_allow_html=True
-                            )
+                for _, row in date_group.iterrows():
+                    render_schedule_row(row)
+
+        # ── Knockout Stage ────────────────────────────────────────────
+        if len(knockout_sched) > 0:
+            st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
+            st.markdown("""
+                <p style='font-family:Bebas Neue,sans-serif; font-size:1.8rem; 
+                color:#ffffff; letter-spacing:0.1em; margin:1rem 0 0.5rem 0;
+                border-left:4px solid #f0c040; padding-left:0.8rem;'>
+                🏆 Knockout Stage</p>
+            """, unsafe_allow_html=True)
+
+            knockout_sched = knockout_sched.copy()
+            knockout_sched["stage_order"] = knockout_sched["stage"].str.lower().map(STAGE_ORDER_MAP)
+            knockout_sched = knockout_sched.sort_values(["stage_order", "local_date"])
+
+            for _, stage_group in knockout_sched.groupby("stage_order", sort=True):
+                actual_stage_name = stage_group["stage"].iloc[0]
+                st.markdown(
+                    f"<p style='font-family:Bebas Neue,sans-serif; font-size:1.3rem; "
+                    f"color:#f0c040; letter-spacing:0.08em; margin:1.2rem 0 0.5rem 0; "
+                    f"border-left:3px solid #f0c040; padding-left:0.6rem;'>"
+                    f"{actual_stage_name.upper()}</p>",
+                    unsafe_allow_html=True
+                )
+                for _, row in stage_group.iterrows():
+                    render_schedule_row(row)
