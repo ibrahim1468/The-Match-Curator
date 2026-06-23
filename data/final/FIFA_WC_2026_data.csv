@@ -73,7 +73,7 @@ match_id,date,group,stage,match,team1,team2,time,venue,category,reason,score_tea
 72,28/06/2026,Group J,group stage,Jordan vs Argentina,Jordan,Argentina,7:00,Dallas Stadium,Optional,"Messi's World Cup farewell tour meets Jordan's organized survival structure in a star-driven but heavily mismatched group opener | Argentina arrive as defending World Cup champions with Messi's creative orchestration, Lautaro Martínez's clinical finishing, and the collective confidence of a squad that has won everything together in recent years, while Jordan compete in their first World Cup with a disciplined defensive structure, organized low-block compactness, and counter-attacking intent designed to limit the damage against elite opposition. The quality gap is significant across every department and Jordan's attacking ambition is severely limited. One direction is Argentina's champion quality breaking Jordan's defensive structure early and imposing comfortable control — the other is Jordan's discipline and defensive organization keeping Argentina's scoring opportunities limited long enough to make this genuinely uncomfortable for the favorites.",0,0,,4,1,0,6,2,5,5,0,-3,5
 73,29/06/2026,,Round of 32,1A vs 3CEFHI,1A,3CEFHI,0:00,Los Angeles Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 74,29/06/2026,,Round of 32,1B vs 3EFGIJ,1B,3EFGIJ,22:00,Houston Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
-75,30/06/2026,,Round of 32,Germany vs Jordan,Germany,3ABCDF,1:30,Boston Stadium,Optional,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
+75,30/06/2026,,Round of 32,Germany vs 3ABCDF,Germany,3ABCDF,1:30,Boston Stadium,Optional,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 76,30/06/2026,,Round of 32,1D vs 3BEFIJ,1D,3BEFIJ,6:00,Estadio Monterrey,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 77,30/06/2026,,Round of 32,1E vs 3ABCDF,1E,3ABCDF,22:00,Dallas Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 78,01/07/2026,,Round of 32,1F vs 2C,1F,2C,2:00,New York New Jersey Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
@@ -85,7 +85,7 @@ match_id,date,group,stage,match,team1,team2,time,venue,category,reason,score_tea
 84,03/07/2026,,Round of 32,1L vs 3EHIJK,1L,3EHIJK,4:00,Toronto Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 85,03/07/2026,,Round of 32,2A vs 2B,2A,2B,8:00,BC Place Vancouver,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 86,03/07/2026,,Round of 32,2D vs 2G,2D,2G,22:00,Dallas Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
-87,04/07/2026,,Round of 32,2E vs 2I,2E,2I,3:00,Miami Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
+87,04/07/2026,,Round of 32,Argentina vs 2I,Argentina,2I,3:00,Miami Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 88,04/07/2026,,Round of 32,2K vs 2L,2K,2L,6:30,Kansas City Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 89,04/07/2026,,Round of 16,W73 vs W74,W73,W74,22:00,Houston Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
 90,05/07/2026,,Round of 16,W75 vs W76,W75,W76,2:00,Philadelphia Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0
