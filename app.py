@@ -1841,10 +1841,27 @@ with tab_schedule:
                         f"{'  ⭐' if is_fav else ''}",
                         unsafe_allow_html=True
                     )
+                    confirmed_val = str(row.get("confirmed", "")).strip().lower() if pd.notna(row.get("confirmed")) else ""
+                    if str(row.get("stage", "")).strip().lower() == "round of 32" and confirmed_val in ["confirmed", "unconfirmed"]:
+                        is_confirmed = confirmed_val == "confirmed"
+                        conf_bg    = "#1a4d1a" if is_confirmed else "#2a2a2a"
+                        conf_border = "#2d8a2d" if is_confirmed else "#666666"
+                        conf_color  = "#90ee90" if is_confirmed else "#cccccc"
+                        conf_label  = "✓ Confirmed" if is_confirmed else "Unconfirmed"
+                        confirmed_badge = (
+                            f"<span style='display:inline-block; padding:0.2rem 0.7rem; "
+                            f"border-radius:20px; font-size:0.7rem; font-weight:700; "
+                            f"letter-spacing:0.08em; background:{conf_bg}; color:{conf_color}; "
+                            f"border:1px solid {conf_border}; vertical-align:middle; margin-left:6px;'>"
+                            f"{conf_label}</span>"
+                        )
+                    else:
+                        confirmed_badge = ""
+
                     st.markdown(
                         f"<p style='font-family:Bebas Neue,sans-serif; font-size:1.3rem; "
                         f"color:#ffffff; margin:0.2rem 0; letter-spacing:0.06em;'>"
-                        f"{flag1} {t1_display} vs {t2_display} {flag2}</p>",
+                        f"{flag1} {t1_display} vs {t2_display} {flag2}{confirmed_badge}</p>",
                         unsafe_allow_html=True
                     )
                     st.caption(f"📍 {row['venue']}  ·  {row['group'] if pd.notna(row['group']) else row['stage']}")
