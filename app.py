@@ -173,7 +173,7 @@ def load_data():
     return df
 
 df = load_data()
-df["date"] = pd.to_datetime(df["date"])
+df["date"] = pd.to_datetime(df["date"], format="mixed", dayfirst=False)
 
 def get_match_datetime(row):
     try:
