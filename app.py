@@ -169,7 +169,7 @@ def resolve_team(slot, df):
 
 @st.cache_data(ttl=60)
 def load_data():
-    df = pd.read_csv("data/final/FIFA_WC_2026_data.csv", encoding="utf-8-sig")
+    df = pd.read_csv("data/final/FIFA_WC_2026_data.csv", encoding="cp1252")
     df["date"] = pd.to_datetime(df["date"])
     return df
 
