@@ -173,7 +173,14 @@ def load_data():
     return df
 
 df = load_data()
-df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+
+for i, value in enumerate(df["date"]):
+    try:
+        pd.to_datetime(value, dayfirst=True)
+    except Exception as e:
+        print(f"Row {i}: {value}")
+        print(e)
+        break
 
 def get_match_datetime(row):
     try:
