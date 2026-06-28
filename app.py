@@ -855,7 +855,10 @@ def get_flag_b64(team_name):
         return f"<img src='data:image/png;base64,{data}' style='height:28px; width:42px; object-fit:cover; border-radius:3px; vertical-align:middle; margin:0 4px;'>"
     except Exception:
         return f"<span style='color:#666; font-size:0.9rem;'>[{team_name}]</span>"
-    
+
+KNOCKOUT_STAGES = ["round of 32", "round of 16", "quarter-final",
+                   "semi-final", "play-off for third place", "final"]
+
 CATEGORY_COLORS = {
     "Must Watch":     {"bg": "#d4f5d4", "border": "#2d8a2d", "badge_bg": "#2d8a2d", "badge_text": "#ffffff"},
     "Worth Watching": {"bg": "#d0f0f8", "border": "#0099bb", "badge_bg": "#0099bb", "badge_text": "#ffffff"},
@@ -1512,13 +1515,10 @@ def display_team_name(name):
         return f"<span style='color:#888; font-style:italic;'>Runner-up M{name[1:]}</span>"
     return name
 
-if category == "TBD":
-    stage_val = str(row.get("stage", "")).strip()
-    if stage_val.lower() in [s.lower() for s in KNOCKOUT_STAGES]:
-        category = stage_val.title()
-
 def render_card(row, favorite_team=None, rank=None):
     category = str(row["category"])
+    if category == "TBD" and str(row.get("stage", "")).strip().lower() in KNOCKOUT_STAGES:
+        category = str(row["stage"]).strip().title()
     colors = CATEGORY_COLORS.get(category, CATEGORY_COLORS["TBD"])
     short_reason, extended_reason = parse_reason(row["reason"])
     title_size = "1.4rem" if IS_MOBILE else "2rem"
@@ -1600,15 +1600,18 @@ KNOCKOUT_STAGES = ["round of 32", "round of 16", "quarter-final",
                    "semi-final", "play-off for third place", "final"]
 
 is_knockout = df["stage"].str.lower().isin(KNOCKOUT_STAGES)
-is_group    = ~is_knockout
 
 today_matches = df[
     (df["match_datetime"] > NOW) &
     (df["match_datetime"] <= next_24h) &
     (df["winner"].fillna("") == "") &
     (
-        is_knockout |                                        # knockouts always shown
-        (is_group & (df["category"] != "TBD") & df["category"].isin(selected_categories))
+        is_knockout |
+        (
+            ~is_knockout &
+            (df["category"] != "TBD") &
+            df["category"].isin(selected_categories)
+        )
     )
 ].copy()
 
@@ -1855,22 +1858,7 @@ with tab_schedule:
                         f"{'  ⭐' if is_fav else ''}",
                         unsafe_allow_html=True
                     )
-                    confirmed_val = str(row.get("confirmed", "")).strip().lower() if pd.notna(row.get("confirmed")) else ""
-                    if str(row.get("stage", "")).strip().lower() == "round of 32" and confirmed_val in ["confirmed", "unconfirmed"]:
-                        is_confirmed = confirmed_val == "confirmed"
-                        conf_bg    = "#1a4d1a" if is_confirmed else "#2a2a2a"
-                        conf_border = "#2d8a2d" if is_confirmed else "#666666"
-                        conf_color  = "#90ee90" if is_confirmed else "#cccccc"
-                        conf_label  = "✓ Confirmed" if is_confirmed else "Unconfirmed"
-                        confirmed_badge = (
-                            f"<span style='display:inline-block; padding:0.2rem 0.7rem; "
-                            f"border-radius:20px; font-size:0.7rem; font-weight:700; "
-                            f"letter-spacing:0.08em; background:{conf_bg}; color:{conf_color}; "
-                            f"border:1px solid {conf_border}; vertical-align:middle; margin-left:6px;'>"
-                            f"{conf_label}</span>"
-                        )
-                    else:
-                        confirmed_badge = ""
+                    confirmed_badge = ""
 
                     st.markdown(
                         f"<p style='font-family:Bebas Neue,sans-serif; font-size:1.3rem; "
