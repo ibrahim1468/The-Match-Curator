@@ -1512,6 +1512,11 @@ def display_team_name(name):
         return f"<span style='color:#888; font-style:italic;'>Runner-up M{name[1:]}</span>"
     return name
 
+if category == "TBD":
+    stage_val = str(row.get("stage", "")).strip()
+    if stage_val.lower() in [s.lower() for s in KNOCKOUT_STAGES]:
+        category = stage_val.title()
+
 def render_card(row, favorite_team=None, rank=None):
     category = str(row["category"])
     colors = CATEGORY_COLORS.get(category, CATEGORY_COLORS["TBD"])
@@ -1591,12 +1596,20 @@ if POST_TOURNAMENT:
     """, unsafe_allow_html=True)
     st.stop()
 
+KNOCKOUT_STAGES = ["round of 32", "round of 16", "quarter-final", 
+                   "semi-final", "play-off for third place", "final"]
+
+is_knockout = df["stage"].str.lower().isin(KNOCKOUT_STAGES)
+is_group    = ~is_knockout
+
 today_matches = df[
-    (df["match_datetime"] > NOW) &           # strictly future only
+    (df["match_datetime"] > NOW) &
     (df["match_datetime"] <= next_24h) &
-    (df["category"] != "TBD") &
-    (df["category"].isin(selected_categories)) &
-    (df["winner"].fillna("") == "")          # not already finished
+    (df["winner"].fillna("") == "") &
+    (
+        is_knockout |                                        # knockouts always shown
+        (is_group & (df["category"] != "TBD") & df["category"].isin(selected_categories))
+    )
 ].copy()
 
 # Also exclude any currently live matches
