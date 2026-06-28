@@ -167,7 +167,8 @@ def resolve_team(slot, df):
 
     return slot  # unresolved — keep slot code for now
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=45)   # change to:
+@st.cache_data(ttl=10)
 def load_data():
     df = pd.read_csv("data/final/FIFA_WC_2026_data.csv", encoding="cp850")
     return df
@@ -190,9 +191,18 @@ def get_match_datetime(row):
                        row["date"].day, 0, 0, tzinfo=PKT)
 
 df["match_datetime"] = df.apply(get_match_datetime, axis=1)
-for _ in range(5):
-    for col in ["team1", "team2"]:
-        df[col] = df[col].apply(lambda x: resolve_team(x, df))
+def resolve_all(df):
+    changed = True
+    while changed:
+        changed = False
+        for col in ["team1", "team2"]:
+            new = df[col].apply(lambda x: resolve_team(x, df))
+            if not new.equals(df[col]):
+                changed = True
+                df[col] = new
+    return df
+
+df = resolve_all(df)
 
 try:
     screen_width = int(st.query_params.get("sw", 1200))
@@ -838,21 +848,22 @@ import base64
 BASE_DIR = Path(__file__).resolve().parent
 FLAG_DIR = BASE_DIR / "Assets" / "Flags"
 
-def get_flag_b64(team_name):
+def get_flag_b64(team_name, height=28):
     if not team_name or pd.isna(team_name):
         return ""
-    
     team_name = str(team_name).strip()
     flag_path = FLAG_DIR / f"{team_name}.png"
-    
     if not flag_path.exists():
         alt_name = team_name.replace(" ", "").replace(" and ", "&")
         flag_path = FLAG_DIR / f"{alt_name}.png"
-    
     try:
         with open(flag_path, "rb") as f:
             data = base64.b64encode(f.read()).decode("utf-8")
-        return f"<img src='data:image/png;base64,{data}' style='height:28px; width:42px; object-fit:cover; border-radius:3px; vertical-align:middle; margin:0 4px;'>"
+        return (
+            f"<img src='data:image/png;base64,{data}' "
+            f"style='height:{height}px; width:{int(height*1.5)}px; "
+            f"object-fit:cover; border-radius:2px; vertical-align:middle;'>"
+        )
     except Exception:
         return f"<span style='color:#666; font-size:0.9rem;'>[{team_name}]</span>"
 
@@ -1701,14 +1712,797 @@ st.markdown("<hr class='section-divider'>", unsafe_allow_html=True)
 if PRE_TOURNAMENT:
     tabs = st.tabs(["📅 Full Schedule"])
     tab_schedule = tabs[0]
+    tab_bracket = None
     active_tabs = ["schedule"]
 else:
-    tab_standings, tab_schedule = st.tabs([
+    tab_standings, tab_bracket, tab_schedule = st.tabs([
         "📊 Group Standings",
-        "📅 Fixtures & Results"
+        "🏆 Knockout Bracket",
+        "📅 Fixtures & Results",
     ])
-    active_tabs = ["standings", "schedule"]
+    active_tabs = ["standings", "bracket", "schedule"]
 
+
+# ── Knockout Bracket Tab ──────────────────────────────────────────────────────
+if "bracket" in active_tabs and tab_bracket is not None:
+    with tab_bracket:
+
+        # ── Data prep ────────────────────────────────────────────────────────
+        BRACKET_STAGES = [
+            "round of 32", "round of 16",
+            "quarter-final", "semi-final", "final"
+        ]
+        bracket_df = df[df["stage"].str.lower().isin(BRACKET_STAGES)].copy()
+        bracket_df["stage_lower"] = bracket_df["stage"].str.lower()
+
+        def get_bracket_matches(stage):
+            return bracket_df[bracket_df["stage_lower"] == stage].sort_values("match_id").reset_index(drop=True)
+
+        r32  = get_bracket_matches("round of 32")
+        r16  = get_bracket_matches("round of 16")
+        qf   = get_bracket_matches("quarter-final")
+        sf   = get_bracket_matches("semi-final")
+        fin  = get_bracket_matches("final")
+
+        # Category → color mapping (matches your existing scheme)
+        CAT_COLORS = {
+            "Must Watch":     "#2d8a2d",
+            "Worth Watching": "#0099bb",
+            "Optional":       "#cccc00",
+            "Skip":           "#cc0000",
+            "TBD":            "#555555",
+        }
+        CAT_BG = {
+            "Must Watch":     "#d4f5d4",
+            "Worth Watching": "#d0f0f8",
+            "Optional":       "#feffd4",
+            "Skip":           "#fdd4d4",
+            "TBD":            "#2a2a2a",
+        }
+        # Text color on dark background
+        CAT_TEXT = {
+            "Must Watch":     "#90ee90",
+            "Worth Watching": "#66ddff",
+            "Optional":       "#eeee44",
+            "Skip":           "#ff8888",
+            "TBD":            "#aaaaaa",
+        }
+
+        def team_display_short(name):
+            name = str(name).strip()
+            if name.startswith("W"):
+                return f"W{name[1:]}"
+            if name.startswith("L"):
+                return f"L{name[1:]}"
+            return TEAM_SHORT.get(name, name)
+
+        def card_color(cat):
+            return CAT_TEXT.get(str(cat), CAT_TEXT["TBD"])
+
+        def border_color(cat):
+            return CAT_COLORS.get(str(cat), CAT_COLORS["TBD"])
+
+        def score_str(row):
+            try:
+                s1 = str(row["score_team1"]).split(".")[0]
+                s2 = str(row["score_team2"]).split(".")[0]
+                if s1 not in ["", "nan"] and s2 not in ["", "nan"]:
+                    return f"{s1}–{s2}"
+            except:
+                pass
+            return ""
+
+        def winner_of(row):
+            w = str(row["winner"]).strip() if pd.notna(row["winner"]) else ""
+            if w in ["", "nan", "0", "TBD"]:
+                return ""
+            return w
+
+        STAGE_SIZES = {
+            "round of 32":   {"team_h": 44, "card_w": 180, "col_gap": 70,  "v_gap": 28},
+            "round of 16":   {"team_h": 48, "card_w": 195, "col_gap": 75,  "v_gap": 30},
+            "quarter-final": {"team_h": 54, "card_w": 215, "col_gap": 80,  "v_gap": 34},
+            "semi-final":    {"team_h": 62, "card_w": 230, "col_gap": 90,  "v_gap": 40},
+            "final":         {"team_h": 70, "card_w": 245, "col_gap": 100, "v_gap": 48},
+        }
+
+        TEAM_H = 44
+        CARD_H = TEAM_H * 2 + 6
+        CARD_W = 180
+        COL_GAP = 70
+        V_GAP = 28
+
+        # stage column order: R32 left, Final center
+        # We draw left-half: R32(8) → R16(4) → QF(2) → SF(1)
+        # and right-half:    SF(1) → QF(2) → R16(4) → R32(8) mirrored
+        # Final sits in the absolute centre
+
+        def make_team_slot(name, cat, is_winner, score_side="", team_h=44, winner="", opponent=""):
+            name_str = str(name).strip()
+            border = border_color(cat)
+
+            has_result = winner != ""
+            is_loser = has_result and not is_winner
+
+            # Background + opacity
+            if is_winner:
+                bg = "#1a2e1a"
+                opacity = "1"
+                name_color = CAT_TEXT.get(cat, CAT_TEXT['TBD'])
+                flag_filter = ""
+            elif is_loser:
+                bg = "#1a1a1a"
+                opacity = "0.45"
+                name_color = "#666"
+                flag_filter = "filter:grayscale(100%);"
+            else:
+                bg = "#1e1e1e"
+                opacity = "1"
+                name_color = CAT_TEXT.get(cat, CAT_TEXT['TBD'])
+                flag_filter = ""
+
+            bold  = "700" if is_winner else "400"
+            trophy = " 🏆" if is_winner else ""
+
+            if name_str.startswith("W") and name_str[1:].isdigit():
+                slot_html = (
+                    f"<span style='font-family:Barlow,sans-serif; font-size:0.7rem; "
+                    f"color:#444; font-style:italic;'>W{name_str[1:]}</span>"
+                )
+            elif name_str.startswith("L") and name_str[1:].isdigit():
+                slot_html = (
+                    f"<span style='font-family:Barlow,sans-serif; font-size:0.7rem; "
+                    f"color:#444; font-style:italic;'>L{name_str[1:]}</span>"
+                )
+            else:
+                flag_b64 = get_flag_b64(name_str, height=16)
+                short = TEAM_SHORT.get(name_str, name_str)
+                flag_img = flag_b64.replace("<img ", f"<img style='{flag_filter}' ") if flag_filter else flag_b64
+                slot_html = (
+                    f"<span style='display:flex; align-items:center; gap:5px;'>"
+                    f"{flag_img}"
+                    f"<span style='font-family:Barlow,sans-serif; font-size:0.78rem; "
+                    f"font-weight:{bold}; color:{name_color};'>{short}{trophy}</span>"
+                    f"</span>"
+                )
+
+            score_html = (
+                f"<span style='margin-left:auto; font-family:Bebas Neue,sans-serif; "
+                f"font-size:0.95rem; color:#f0c040;'>{score_side}</span>"
+                if score_side and score_side not in ["0", ""] else ""
+            )
+
+            return (
+                f"<div style='height:{team_h}px; display:flex; align-items:center; "
+                f"padding:0 10px; gap:6px; background:{bg}; border-left:3px solid {border}; "
+                f"overflow:hidden; opacity:{opacity};'>"
+                f"{slot_html}{score_html}"
+                f"</div>"
+            )
+
+        def make_match_card(row, confirmed=True):
+            stage = str(row.get("stage", "round of 32")).lower()
+            sz = STAGE_SIZES.get(stage, STAGE_SIZES["round of 32"])
+            t_h = sz["team_h"]
+            c_w = sz["card_w"]
+
+            cat  = str(row.get("category", "TBD"))
+            t1   = str(row["team1"]) if pd.notna(row["team1"]) else "TBD"
+            t2   = str(row["team2"]) if pd.notna(row["team2"]) else "TBD"
+            w    = winner_of(row)
+            sc   = score_str(row)
+            s1, s2 = ("", "")
+            if sc:
+                parts = sc.split("–")
+                s1 = parts[0] if len(parts) > 0 else ""
+                s2 = parts[1] if len(parts) > 1 else ""
+
+            is_tbd = (not confirmed) or t1.startswith(("W","L","1","2","3")) or t2.startswith(("W","L","1","2","3"))
+            effective_cat = "TBD" if is_tbd else cat
+            border = border_color(effective_cat)
+
+            slot1 = make_team_slot(t1, effective_cat, w == t1 and w != "", s1, t_h, w, t2)
+            slot2 = make_team_slot(t2, effective_cat, w == t2 and w != "", s2, t_h, w, t1)
+
+            mid_line = (
+                f"<div style='height:2px; background:linear-gradient(90deg, "
+                f"{border}22, {border}88, {border}22);'></div>"
+            )
+
+            match_id = int(row.get("match_id", 0))
+            is_live = False
+            live_scores = get_live_scores()
+            for lm in live_scores.values():
+                if lm["home"] == t1 or lm["away"] == t1:
+                    is_live = True
+                    break
+
+            live_pulse = ""
+            if is_live:
+                live_pulse = (
+                    f"<div style='background:#c0392b; display:flex; align-items:center; "
+                    f"justify-content:center; gap:5px; padding:3px 10px;'>"
+                    f"<div style='width:6px; height:6px; border-radius:50%; background:#fff; "
+                    f"animation:sbpulse 1.2s infinite;'></div>"
+                    f"<span style='font-size:0.65rem; font-weight:700; color:#fff; "
+                    f"letter-spacing:0.1em;'>LIVE</span>"
+                    f"</div>"
+                )
+
+            card_id = f"match_{match_id}"
+            return (
+                f"<div id='{card_id}' class='bracket-card' data-match='{match_id}' "
+                f"style='width:{c_w}px; border-radius:12px; overflow:hidden; "
+                f"border:1.5px solid {border}; "
+                f"box-shadow: 0 2px 8px rgba(0,0,0,0.4); "
+                f"transition: box-shadow 0.2s ease;'>"
+                f"{live_pulse}"
+                f"{slot1}{mid_line}{slot2}"
+                f"</div>"
+            )
+
+        def split_half(stage_df):
+            n = len(stage_df)
+            mid = n // 2
+            left  = stage_df.iloc[:mid].reset_index(drop=True)
+            right = stage_df.iloc[mid:].reset_index(drop=True)
+            return left, right
+
+        r32_left,  r32_right  = split_half(r32)
+        r16_left,  r16_right  = split_half(r16)
+        qf_left,   qf_right   = split_half(qf)
+        sf_left_df, sf_right_df = split_half(sf)
+        fin_row = fin.iloc[0] if len(fin) > 0 else None
+
+        # ── Rewrite compute_positions_left to accept DataFrames ───────────────
+        def compute_positions(r32_df, r16_df, qf_df, sf_df):
+            stages = {}
+            r32_list = list(r32_df.iterrows())
+            r16_list = list(r16_df.iterrows())
+            qf_list  = list(qf_df.iterrows())
+            sf_list  = list(sf_df.iterrows())
+
+            r32_y_step = CARD_H + V_GAP
+            stages["r32"] = []
+            for i, (_, row) in enumerate(r32_list):
+                y = i * r32_y_step
+                stages["r32"].append((0, y, row))
+
+            r16_x = CARD_W + COL_GAP
+            stages["r16"] = []
+            for j, (_, row) in enumerate(r16_list):
+                i1, i2 = j * 2, j * 2 + 1
+                y1 = stages["r32"][i1][1] if i1 < len(stages["r32"]) else 0
+                y2 = stages["r32"][i2][1] if i2 < len(stages["r32"]) else y1
+                mid_y = (y1 + CARD_H + y2) / 2 - CARD_H / 2
+                stages["r16"].append((r16_x, mid_y, row))
+
+            qf_x = r16_x + CARD_W + COL_GAP
+            stages["qf"] = []
+            for j, (_, row) in enumerate(qf_list):
+                i1, i2 = j * 2, j * 2 + 1
+                y1 = stages["r16"][i1][1] if i1 < len(stages["r16"]) else 0
+                y2 = stages["r16"][i2][1] if i2 < len(stages["r16"]) else y1
+                mid_y = (y1 + CARD_H + y2) / 2 - CARD_H / 2
+                stages["qf"].append((qf_x, mid_y, row))
+
+            sf_x = qf_x + CARD_W + COL_GAP
+            stages["sf"] = []
+            for j, (_, row) in enumerate(sf_list):
+                i1, i2 = j * 2, j * 2 + 1
+                y1 = stages["qf"][i1][1] if i1 < len(stages["qf"]) else 0
+                y2 = stages["qf"][i2][1] if i2 < len(stages["qf"]) else y1
+                mid_y = (y1 + CARD_H + y2) / 2 - CARD_H / 2
+                stages["sf"].append((sf_x, mid_y, row))
+
+            return stages
+
+        lp = compute_positions(r32_left, r16_left, qf_left, sf_left_df)
+        rp = compute_positions(r32_right, r16_right, qf_right, sf_right_df)
+
+        # ── Canvas sizing ─────────────────────────────────────────────────────
+        # Left half width = 4 cols of cards + 3 gaps + padding
+        HALF_W   = CARD_W * 4 + COL_GAP * 3
+        FIN_W    = CARD_W + COL_GAP * 2   # final card + breathing room each side
+        TOTAL_W  = HALF_W * 2 + FIN_W
+        PADDING  = 40
+
+        # Height = tallest half (should be same)
+        n_r32 = max(len(r32_left), len(r32_right))
+        TOTAL_H = n_r32 * (CARD_H + V_GAP) - V_GAP + PADDING * 2
+
+        # Final card Y position = vertical centre
+        FIN_Y = TOTAL_H / 2 - CARD_H / 2
+
+        # ── Connector line helper ─────────────────────────────────────────────
+        def h_connector(x1, y1_mid, x2, y2_mid, color="#444"):
+            """
+            Elbow connector: right-exit from card1 centre → left-entry of card2 centre.
+            """
+            mid_x = (x1 + x2) / 2
+            return (
+                f"<line x1='{x1}' y1='{y1_mid}' x2='{mid_x}' y2='{y1_mid}' "
+                f"stroke='{color}' stroke-width='1.5' stroke-dasharray='4 3'/>"
+                f"<line x1='{mid_x}' y1='{y1_mid}' x2='{mid_x}' y2='{y2_mid}' "
+                f"stroke='{color}' stroke-width='1.5' stroke-dasharray='4 3'/>"
+                f"<line x1='{mid_x}' y1='{y2_mid}' x2='{x2}' y2='{y2_mid}' "
+                f"stroke='{color}' stroke-width='1.5' stroke-dasharray='4 3'/>"
+            )
+
+        # ── Stage label positions (above top card of each column) ─────────────
+        STAGE_LABELS = {
+            "R32":    "ROUND OF 32",
+            "R16":    "ROUND OF 16",
+            "QF":     "QUARTER-FINAL",
+            "SF":     "SEMI-FINAL",
+            "FINAL":  "FINAL",
+        }
+
+        # ── Build HTML ────────────────────────────────────────────────────────
+        # Layout offsets:
+        # Left half:  R32 at x=PADDING, R16, QF, SF going right
+        # Right half: SF at x=HALF_W+FIN_W+PADDING, then QF, R16, R32 going further right (mirrored)
+        # Final:      at x = HALF_W + COL_GAP + PADDING
+
+        L_OFF = PADDING                          # left R32 x-start
+        R_OFF = PADDING + HALF_W + FIN_W        # right R32 x-start (mirrored, card right-edge aligns)
+        FIN_X = PADDING + HALF_W + (FIN_W - CARD_W) / 2
+
+        # Right half: R32 is rightmost, so column order is reversed.
+        # rp["r32"] x=0 → actual x = R_OFF + (HALF_W - CARD_W) - 0 = far right
+        def rx(x):  # mirror x for right half
+            return R_OFF + (HALF_W - CARD_W) - x
+
+        cards_html = ""
+        lines_svg  = ""
+
+        LABEL_H = 32  # extra top padding for labels
+        V_SHIFT  = PADDING + LABEL_H
+
+        # ── Left half cards ───────────────────────────────────────────────────
+        for stage_key, items in lp.items():
+            for (x, y, row) in items:
+                abs_x = L_OFF + x
+                abs_y = V_SHIFT + y
+                confirmed = not (
+                    str(row["team1"]).startswith(("W","L","1","2","3")) or
+                    str(row["team2"]).startswith(("W","L","1","2","3"))
+                )
+                card = make_match_card(row, confirmed=confirmed)
+                cards_html += (
+                    f"<div style='position:absolute; left:{abs_x}px; top:{abs_y}px; width:{CARD_W}px;'>"
+                    f"{card}</div>"
+                )
+
+        # ── Right half cards (mirrored) ───────────────────────────────────────
+        for stage_key, items in rp.items():
+            for (x, y, row) in items:
+                abs_x = rx(x)
+                abs_y = V_SHIFT + y
+                confirmed = not (
+                    str(row["team1"]).startswith(("W","L","1","2","3")) or
+                    str(row["team2"]).startswith(("W","L","1","2","3"))
+                )
+                card = make_match_card(row, confirmed=confirmed)
+                cards_html += (
+                    f"<div style='position:absolute; left:{abs_x}px; top:{abs_y}px; width:{CARD_W}px;'>"
+                    f"{card}</div>"
+                )
+
+        # ── Final card ────────────────────────────────────────────────────────
+        if fin_row is not None:
+            confirmed_fin = not (
+                str(fin_row["team1"]).startswith(("W","L","1","2","3")) or
+                str(fin_row["team2"]).startswith(("W","L","1","2","3"))
+            )
+            fin_card = make_match_card(fin_row, confirmed=confirmed_fin)
+            cards_html += (
+                f"<div style='position:absolute; left:{FIN_X}px; top:{V_SHIFT + FIN_Y}px; "
+                f"width:{CARD_W}px;'>{fin_card}</div>"
+            )
+
+        # ── Connector lines (SVG) ─────────────────────────────────────────────
+        # Left half connectors: R32→R16, R16→QF, QF→SF, SF→Final
+        stage_pairs_left = [
+            ("r32", "r16"),
+            ("r16", "qf"),
+            ("qf", "sf"),
+        ]
+        for s1_key, s2_key in stage_pairs_left:
+            s1_items = lp[s1_key]
+            s2_items = lp[s2_key]
+            for j, (x2, y2, _) in enumerate(s2_items):
+                i1, i2 = j * 2, j * 2 + 1
+                if i1 < len(s1_items) and i2 < len(s1_items):
+                    x1a, y1a, _ = s1_items[i1]
+                    x1b, y1b, _ = s1_items[i2]
+                    # exit right edge of s1 cards → entry left edge of s2 card
+                    xa_out  = L_OFF + x1a + CARD_W
+                    ya_mid  = V_SHIFT + y1a + CARD_H / 2
+                    xb_out  = L_OFF + x1b + CARD_W
+                    yb_mid  = V_SHIFT + y1b + CARD_H / 2
+                    x2_in   = L_OFF + x2
+                    y2_mid  = V_SHIFT + y2 + CARD_H / 2
+                    mid_x   = xa_out + (x2_in - xa_out) / 2
+                    lines_svg += (
+                        f"<line x1='{xa_out}' y1='{ya_mid}' x2='{mid_x}' y2='{ya_mid}' "
+                        f"stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{ya_mid}' x2='{mid_x}' y2='{yb_mid}' "
+                        f"stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{yb_mid}' x2='{xb_out}' y2='{yb_mid}' "
+                        f"stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{y2_mid}' x2='{x2_in}' y2='{y2_mid}' "
+                        f"stroke='#666' stroke-width='1.5'/>"
+                    )
+
+        # SF → Final (left)
+        # SF → Final (left) — horizontal run to fin_in_x, then vertical to final card centre
+        if lp["sf"] and fin_row is not None:
+            x_sf, y_sf, _ = lp["sf"][0]
+            sf_out_x  = L_OFF + x_sf + CARD_W
+            sf_mid_y  = V_SHIFT + y_sf + CARD_H / 2
+            fin_in_x  = FIN_X
+            fin_mid_y = V_SHIFT + FIN_Y + CARD_H / 2
+            mid_x     = sf_out_x + (fin_in_x - sf_out_x) / 2
+            lines_svg += (
+                f"<line x1='{sf_out_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{sf_mid_y}' "
+                f"stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{fin_mid_y}' "
+                f"stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{fin_mid_y}' x2='{fin_in_x}' y2='{fin_mid_y}' "
+                f"stroke='#888' stroke-width='2'/>"
+            )
+
+        # Right half connectors (mirrored — lines go right-to-left)
+        stage_pairs_right = [
+            ("r32", "r16"),
+            ("r16", "qf"),
+            ("qf", "sf"),
+        ]
+        for s1_key, s2_key in stage_pairs_right:
+            s1_items = rp[s1_key]
+            s2_items = rp[s2_key]
+            for j, (x2, y2, _) in enumerate(s2_items):
+                i1, i2 = j * 2, j * 2 + 1
+                if i1 < len(s1_items) and i2 < len(s1_items):
+                    x1a, y1a, _ = s1_items[i1]
+                    x1b, y1b, _ = s1_items[i2]
+                    xa_out  = rx(x1a)                     # left edge of mirrored card
+                    ya_mid  = V_SHIFT + y1a + CARD_H / 2
+                    xb_out  = rx(x1b)
+                    yb_mid  = V_SHIFT + y1b + CARD_H / 2
+                    x2_in   = rx(x2) + CARD_W            # right edge of next-round card
+                    y2_mid  = V_SHIFT + y2 + CARD_H / 2
+                    mid_x   = xa_out - (xa_out - x2_in) / 2
+                    lines_svg += (
+                        f"<line x1='{xa_out}' y1='{ya_mid}' x2='{mid_x}' y2='{ya_mid}' "
+                        f"stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{ya_mid}' x2='{mid_x}' y2='{yb_mid}' "
+                        f"stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{yb_mid}' x2='{xb_out}' y2='{yb_mid}' "
+                        f"stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{y2_mid}' x2='{x2_in}' y2='{y2_mid}' "
+                        f"stroke='#666' stroke-width='1.5'/>"
+                    )
+
+        # SF → Final (right)
+        # SF → Final (right) — symmetric elbow
+        if rp["sf"] and fin_row is not None:
+            x_sf, y_sf, _ = rp["sf"][0]
+            sf_in_x   = rx(x_sf)               # left edge of mirrored SF card
+            sf_mid_y  = V_SHIFT + y_sf + CARD_H / 2
+            fin_out_x = FIN_X + CARD_W
+            fin_mid_y = V_SHIFT + FIN_Y + CARD_H / 2
+            mid_x     = fin_out_x + (sf_in_x - fin_out_x) / 2
+            lines_svg += (
+                f"<line x1='{sf_in_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{sf_mid_y}' "
+                f"stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{fin_mid_y}' "
+                f"stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{fin_mid_y}' x2='{fin_out_x}' y2='{fin_mid_y}' "
+                f"stroke='#888' stroke-width='2'/>"
+            )
+
+        # ── Hardcoded bracket tree (match_id based) ───────────────────────────
+        # Order within each list = top-to-bottom visual order
+        R32_LEFT_IDS  = [75, 78, 73, 76, 84, 83, 82, 81]
+        R32_RIGHT_IDS = [74, 77, 79, 80, 87, 86, 85, 88]
+        R16_LEFT_IDS  = [90, 89, 93, 94]
+        R16_RIGHT_IDS = [91, 92, 95, 96]
+        QF_LEFT_IDS  = [97, 99]
+        QF_RIGHT_IDS = [98, 100]
+        SF_LEFT_IDS   = [101]
+        SF_RIGHT_IDS  = [102]
+        FINAL_ID      = 103
+        THIRD_ID      = 104
+
+        def get_by_ids(stage_df, id_list):
+            rows = []
+            for mid in id_list:
+                match = stage_df[stage_df["match_id"] == mid]
+                if len(match) > 0:
+                    rows.append(match.iloc[0])
+                else:
+                    # placeholder empty row
+                    rows.append(pd.Series({
+                        "match_id": mid, "team1": f"W?", "team2": f"W?",
+                        "stage": "round of 32", "category": "TBD",
+                        "winner": "", "score_team1": "", "score_team2": "",
+                        "venue": "", "date": pd.NaT, "time": ""
+                    }))
+            return pd.DataFrame(rows).reset_index(drop=True)
+
+        r32_left  = get_by_ids(bracket_df, R32_LEFT_IDS)
+        r32_right = get_by_ids(bracket_df, R32_RIGHT_IDS)
+        r16_left  = get_by_ids(bracket_df, R16_LEFT_IDS)
+        r16_right = get_by_ids(bracket_df, R16_RIGHT_IDS)
+        qf_left   = get_by_ids(bracket_df, QF_LEFT_IDS)
+        qf_right  = get_by_ids(bracket_df, QF_RIGHT_IDS)
+        sf_left_df  = get_by_ids(bracket_df, SF_LEFT_IDS)
+        sf_right_df = get_by_ids(bracket_df, SF_RIGHT_IDS)
+
+        fin_matches = bracket_df[bracket_df["match_id"] == FINAL_ID]
+        fin_row = fin_matches.iloc[0] if len(fin_matches) > 0 else None
+        third_matches = bracket_df[bracket_df["match_id"] == THIRD_ID]
+        third_row = third_matches.iloc[0] if len(third_matches) > 0 else None
+
+        lp = compute_positions(r32_left, r16_left, qf_left, sf_left_df)
+        rp = compute_positions(r32_right, r16_right, qf_right, sf_right_df)
+
+        # ── Canvas sizing ─────────────────────────────────────────────────────
+        HALF_W   = CARD_W * 4 + COL_GAP * 3
+        FIN_W    = CARD_W + COL_GAP * 2
+        TOTAL_W  = HALF_W * 2 + FIN_W
+        PADDING  = 40
+
+        n_r32    = 8
+        TOTAL_H  = n_r32 * (CARD_H + V_GAP) - V_GAP + PADDING * 2 + 60  # +60 for 3rd place card
+        FIN_Y    = TOTAL_H / 2 - CARD_H / 2 - 30
+        THIRD_Y  = FIN_Y + CARD_H + V_GAP + 20
+
+        FIN_X    = PADDING + HALF_W + (FIN_W - CARD_W) / 2
+        L_OFF    = PADDING
+        R_OFF    = PADDING + HALF_W + FIN_W
+
+        def rx(x):
+            return R_OFF + (HALF_W - CARD_W) - x
+
+        LABEL_H  = 32
+        V_SHIFT  = PADDING + LABEL_H
+
+        cards_html = ""
+        lines_svg  = ""
+
+        # ── Left half cards ───────────────────────────────────────────────────
+        for stage_key, items in lp.items():
+            for (x, y, row) in items:
+                abs_x = L_OFF + x
+                abs_y = V_SHIFT + y
+                confirmed = not (
+                    str(row["team1"]).startswith(("W","L","1","2","3")) or
+                    str(row["team2"]).startswith(("W","L","1","2","3"))
+                )
+                card = make_match_card(row, confirmed=confirmed)
+                cards_html += (
+                    f"<div style='position:absolute; left:{abs_x}px; top:{abs_y}px; width:{CARD_W}px;'>"
+                    f"{card}</div>"
+                )
+
+        # ── Right half cards (mirrored) ───────────────────────────────────────
+        for stage_key, items in rp.items():
+            for (x, y, row) in items:
+                abs_x = rx(x)
+                abs_y = V_SHIFT + y
+                confirmed = not (
+                    str(row["team1"]).startswith(("W","L","1","2","3")) or
+                    str(row["team2"]).startswith(("W","L","1","2","3"))
+                )
+                card = make_match_card(row, confirmed=confirmed)
+                cards_html += (
+                    f"<div style='position:absolute; left:{abs_x}px; top:{abs_y}px; width:{CARD_W}px;'>"
+                    f"{card}</div>"
+                )
+
+        # ── Final card ────────────────────────────────────────────────────────
+        if fin_row is not None:
+            confirmed_fin = not (
+                str(fin_row["team1"]).startswith(("W","L","1","2","3")) or
+                str(fin_row["team2"]).startswith(("W","L","1","2","3"))
+            )
+            fin_card = make_match_card(fin_row, confirmed=confirmed_fin)
+            cards_html += (
+                f"<div style='position:absolute; left:{FIN_X}px; top:{V_SHIFT + FIN_Y}px; "
+                f"width:{CARD_W}px;'>{fin_card}</div>"
+            )
+
+        # ── 3rd place card (below final, slightly right-offset) ───────────────
+        if third_row is not None:
+            confirmed_third = not (
+                str(third_row["team1"]).startswith(("W","L","1","2","3")) or
+                str(third_row["team2"]).startswith(("W","L","1","2","3"))
+            )
+            third_card = make_match_card(third_row, confirmed=confirmed_third)
+            third_label = (
+                f"<div style='position:absolute; left:{FIN_X + CARD_W + 20}px; "
+                f"top:{V_SHIFT + THIRD_Y - 20}px; "
+                f"font-family:Bebas Neue,sans-serif; font-size:0.75rem; "
+                f"color:#888; letter-spacing:0.1em;'>3RD PLACE</div>"
+            )
+            cards_html += third_label
+            cards_html += (
+                f"<div style='position:absolute; left:{FIN_X + CARD_W + 20}px; "
+                f"top:{V_SHIFT + THIRD_Y}px; width:{CARD_W}px;'>{third_card}</div>"
+            )
+
+        # ── Connector lines ───────────────────────────────────────────────────
+        def draw_connectors(half_pos, is_right=False):
+            svg = ""
+            stage_pairs = [("r32","r16"), ("r16","qf"), ("qf","sf")]
+            for s1_key, s2_key in stage_pairs:
+                s1_items = half_pos[s1_key]
+                s2_items = half_pos[s2_key]
+                for j, (x2, y2, _) in enumerate(s2_items):
+                    i1, i2 = j * 2, j * 2 + 1
+                    if i1 >= len(s1_items) or i2 >= len(s1_items):
+                        continue
+                    x1a, y1a, _ = s1_items[i1]
+                    x1b, y1b, _ = s1_items[i2]
+                    if not is_right:
+                        xa_out = L_OFF + x1a + CARD_W
+                        ya_mid = V_SHIFT + y1a + CARD_H / 2
+                        xb_out = L_OFF + x1b + CARD_W
+                        yb_mid = V_SHIFT + y1b + CARD_H / 2
+                        x2_in  = L_OFF + x2
+                        y2_mid = V_SHIFT + y2 + CARD_H / 2
+                        mid_x  = xa_out + (x2_in - xa_out) / 2
+                    else:
+                        xa_out = rx(x1a)
+                        ya_mid = V_SHIFT + y1a + CARD_H / 2
+                        xb_out = rx(x1b)
+                        yb_mid = V_SHIFT + y1b + CARD_H / 2
+                        x2_in  = rx(x2) + CARD_W
+                        y2_mid = V_SHIFT + y2 + CARD_H / 2
+                        mid_x  = xa_out - (xa_out - x2_in) / 2
+                    svg += (
+                        f"<line x1='{xa_out}' y1='{ya_mid}' x2='{mid_x}' y2='{ya_mid}' stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{ya_mid}' x2='{mid_x}' y2='{yb_mid}' stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{yb_mid}' x2='{xb_out}' y2='{yb_mid}' stroke='#444' stroke-width='1.5'/>"
+                        f"<line x1='{mid_x}' y1='{y2_mid}' x2='{x2_in}' y2='{y2_mid}' stroke='#666' stroke-width='1.5'/>"
+                    )
+            return svg
+
+        lines_svg += draw_connectors(lp, is_right=False)
+        lines_svg += draw_connectors(rp, is_right=True)
+
+        # SF → Final (left)
+        if lp["sf"] and fin_row is not None:
+            x_sf, y_sf, _ = lp["sf"][0]
+            sf_out_x  = L_OFF + x_sf + CARD_W
+            sf_mid_y  = V_SHIFT + y_sf + CARD_H / 2
+            fin_in_x  = FIN_X
+            fin_mid_y = V_SHIFT + FIN_Y + CARD_H / 2
+            mid_x     = sf_out_x + (fin_in_x - sf_out_x) / 2
+            lines_svg += (
+                f"<line x1='{sf_out_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{sf_mid_y}' stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{fin_mid_y}' stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{fin_mid_y}' x2='{fin_in_x}' y2='{fin_mid_y}' stroke='#888' stroke-width='2'/>"
+            )
+
+        # SF → Final (right)
+        if rp["sf"] and fin_row is not None:
+            x_sf, y_sf, _ = rp["sf"][0]
+            sf_in_x   = rx(x_sf)
+            sf_mid_y  = V_SHIFT + y_sf + CARD_H / 2
+            fin_out_x = FIN_X + CARD_W
+            fin_mid_y = V_SHIFT + FIN_Y + CARD_H / 2
+            mid_x     = fin_out_x + (sf_in_x - fin_out_x) / 2
+            lines_svg += (
+                f"<line x1='{sf_in_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{sf_mid_y}' stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{sf_mid_y}' x2='{mid_x}' y2='{fin_mid_y}' stroke='#888' stroke-width='2'/>"
+                f"<line x1='{mid_x}' y1='{fin_mid_y}' x2='{fin_out_x}' y2='{fin_mid_y}' stroke='#888' stroke-width='2'/>"
+            )
+
+        # ── Stage labels ──────────────────────────────────────────────────────
+        r_r32_x = rx(0)
+        r_r16_x = rx(CARD_W + COL_GAP)
+        r_qf_x  = rx((CARD_W + COL_GAP) * 2)
+        r_sf_x  = rx((CARD_W + COL_GAP) * 3)
+
+        label_positions = [
+            (L_OFF,                          "ROUND OF 32"),
+            (L_OFF + CARD_W + COL_GAP,       "ROUND OF 16"),
+            (L_OFF + (CARD_W + COL_GAP) * 2, "QUARTER-FINAL"),
+            (L_OFF + (CARD_W + COL_GAP) * 3, "SEMI-FINAL"),
+            (FIN_X,                           "FINAL"),
+            (r_sf_x,                          "SEMI-FINAL"),
+            (r_qf_x,                          "QUARTER-FINAL"),
+            (r_r16_x,                         "ROUND OF 16"),
+            (r_r32_x,                         "ROUND OF 32"),
+        ]
+
+        labels_html = ""
+        for lx, label in label_positions:
+            labels_html += (
+                f"<div style='position:absolute; left:{lx}px; top:{PADDING - 4}px; "
+                f"width:{CARD_W}px; text-align:center; "
+                f"font-family:Bebas Neue,sans-serif; font-size:0.8rem; "
+                f"color:#666; letter-spacing:0.12em;'>{label}</div>"
+            )
+
+        # ── Legend ────────────────────────────────────────────────────────────
+        legend_html = "".join([
+            f"<span style='display:inline-flex; align-items:center; gap:5px; margin-right:16px; "
+            f"font-family:Barlow,sans-serif; font-size:0.75rem; color:{CAT_TEXT[c]};'>"
+            f"<span style='width:10px; height:10px; border-radius:2px; background:{CAT_COLORS[c]}; "
+            f"display:inline-block;'></span>{c}</span>"
+            for c in ["Must Watch", "Worth Watching", "Optional", "Skip", "TBD"]
+        ])
+
+        # ── Render ────────────────────────────────────────────────────────────
+        with tab_bracket:
+
+    # ... all your existing bracket data prep, compute_positions, 
+    # cards_html, lines_svg, labels_html building code stays exactly as is ...
+
+    # ── Render ── (this is your existing components.html, with the CSS added)
+            components.html(
+                f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+                <style>
+                body {{ margin: 0; padding: 0; background: #0a0a0a; }}
+                .bracket-scroll {{
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    padding-bottom: 16px;
+                    scrollbar-width: thin;
+                    scrollbar-color: #333 #111;
+                }}
+                .bracket-scroll::-webkit-scrollbar {{ height: 6px; }}
+                .bracket-scroll::-webkit-scrollbar-track {{ background: #111; }}
+                .bracket-scroll::-webkit-scrollbar-thumb {{ background: #444; border-radius: 3px; }}
+                .bracket-canvas {{
+                    position: relative;
+                    width: {TOTAL_W + PADDING * 2}px;
+                    height: {TOTAL_H + LABEL_H}px;
+                    background: #0a0a0a;
+                }}
+                @keyframes sbpulse {{ 0%,100%{{opacity:1}} 50%{{opacity:0.25}} }}
+                .bracket-card {{
+                    cursor: pointer;
+                    transition: box-shadow 0.2s ease, transform 0.15s ease;
+                }}
+                .bracket-card:hover {{
+                    box-shadow: 0 0 0 2px #ffffff55, 0 4px 16px rgba(0,0,0,0.6) !important;
+                    transform: translateY(-1px);
+                    z-index: 10;
+                    position: relative;
+                }}
+                </style>
+                </head>
+                <body>
+                <div style="font-family:Barlow,sans-serif; font-size:0.78rem; color:#666;
+                margin-bottom:10px; padding:4px 8px;">
+                {legend_html}
+                </div>
+                <div class="bracket-scroll">
+                <div class="bracket-canvas">
+                    <svg style="position:absolute; top:0; left:0; width:100%; height:100%;
+                    pointer-events:none; overflow:visible;">
+                    {lines_svg}
+                    </svg>
+                    {labels_html}
+                    {cards_html}
+                </div>
+                </div>
+                </body>
+                </html>
+                """,
+                height=TOTAL_H + LABEL_H + 60,
+                scrolling=True,
+            )
 # ── Group Standings Tab ───────────────────────────────────────────────────────
 if "standings" in active_tabs:
     with tab_standings:
@@ -1737,7 +2531,6 @@ if "standings" in active_tabs:
                             bg = "#1a2e1a" if rank_idx <= 2 else "#1a1a1a"
                             border = "#2d8a2d" if rank_idx <= 2 else "#333333"
                             rank_color = "#90ee90" if rank_idx <= 2 else "#666666"
-                            flag = get_flag_b64(team)
                             gd_str = f"+{stats['gd']}" if stats['gd'] > 0 else str(stats['gd'])
 
                             group_html += (
@@ -1747,7 +2540,6 @@ if "standings" in active_tabs:
                                 f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
                                 f"<div style='display:flex; align-items:center; gap:6px;'>"
                                 f"<span style='color:{rank_color}; font-weight:700; font-size:0.85rem; min-width:16px;'>{rank_idx}</span>"
-                                f"{flag}"
                                 f"<span style='color:#ffffff; font-size:0.85rem; font-weight:600;'>{team}</span>"
                                 f"</div>"
                                 f"<span style='color:#ffffff; font-weight:700; font-size:1rem;'>{stats['points']}</span>"
