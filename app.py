@@ -174,13 +174,16 @@ def load_data():
 
 df = load_data()
 
+# Debug problematic dates
 for i, value in enumerate(df["date"]):
     try:
         pd.to_datetime(value, dayfirst=True)
     except Exception as e:
         print(f"Row {i}: {value}")
         print(e)
-        break
+
+# Then convert column properly
+df["date"] = pd.to_datetime(df["date"], dayfirst=True)
 
 def get_match_datetime(row):
     try:
