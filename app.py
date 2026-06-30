@@ -1823,41 +1823,44 @@ if "bracket" in active_tabs and tab_bracket is not None:
 
             has_result = winner != ""
             is_loser = has_result and not is_winner
+            is_tbd_slot = name_str.startswith(("W", "L")) and name_str[1:].isdigit()
 
-            # Background + opacity
             if is_winner:
                 bg = "#1a2e1a"
-                opacity = "1"
                 name_color = CAT_TEXT.get(cat, CAT_TEXT['TBD'])
                 flag_filter = ""
+                score_color = "#f0c040"
             elif is_loser:
-                bg = "#1a1a1a"
-                opacity = "0.45"
-                name_color = "#666"
-                flag_filter = "filter:grayscale(100%);"
+                bg = "#161616"
+                name_color = "#888"
+                flag_filter = "filter:grayscale(60%) brightness(0.8);"
+                score_color = "#6b5a20"
             else:
-                bg = "#1e1e1e"
-                opacity = "1"
-                name_color = CAT_TEXT.get(cat, CAT_TEXT['TBD'])
+                bg = "#252525" if is_tbd_slot else "#1e1e1e"
+                name_color = "#777" if is_tbd_slot else CAT_TEXT.get(cat, CAT_TEXT['TBD'])
                 flag_filter = ""
+                score_color = "#f0c040"
 
             bold  = "700" if is_winner else "400"
             trophy = " 🏆" if is_winner else ""
 
             if name_str.startswith("W") and name_str[1:].isdigit():
                 slot_html = (
-                    f"<span style='font-family:Barlow,sans-serif; font-size:0.7rem; "
-                    f"color:#444; font-style:italic;'>W{name_str[1:]}</span>"
+                    f"<span style='font-family:Barlow,sans-serif; font-size:0.72rem; "
+                    f"color:#666; font-style:italic;'>Winner of M{name_str[1:]}</span>"
                 )
             elif name_str.startswith("L") and name_str[1:].isdigit():
                 slot_html = (
-                    f"<span style='font-family:Barlow,sans-serif; font-size:0.7rem; "
-                    f"color:#444; font-style:italic;'>L{name_str[1:]}</span>"
+                    f"<span style='font-family:Barlow,sans-serif; font-size:0.72rem; "
+                    f"color:#666; font-style:italic;'>Runner-up M{name_str[1:]}</span>"
                 )
             else:
                 flag_b64 = get_flag_b64(name_str, height=16)
                 short = TEAM_SHORT.get(name_str, name_str)
-                flag_img = flag_b64.replace("<img ", f"<img style='{flag_filter}' ") if flag_filter else flag_b64
+                if flag_filter:
+                    flag_img = flag_b64.replace("style='", f"style='{flag_filter} ", 1)
+                else:
+                    flag_img = flag_b64
                 slot_html = (
                     f"<span style='display:flex; align-items:center; gap:5px;'>"
                     f"{flag_img}"
@@ -1868,14 +1871,14 @@ if "bracket" in active_tabs and tab_bracket is not None:
 
             score_html = (
                 f"<span style='margin-left:auto; font-family:Bebas Neue,sans-serif; "
-                f"font-size:0.95rem; color:#f0c040;'>{score_side}</span>"
+                f"font-size:0.95rem; color:{score_color};'>{score_side}</span>"
                 if score_side and score_side not in ["0", ""] else ""
             )
 
             return (
                 f"<div style='height:{team_h}px; display:flex; align-items:center; "
                 f"padding:0 10px; gap:6px; background:{bg}; border-left:3px solid {border}; "
-                f"overflow:hidden; opacity:{opacity};'>"
+                f"overflow:hidden;'>"
                 f"{slot_html}{score_html}"
                 f"</div>"
             )
