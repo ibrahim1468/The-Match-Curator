@@ -2216,8 +2216,8 @@ if "bracket" in active_tabs and tab_bracket is not None:
         QF_RIGHT_IDS = [98, 100]
         SF_LEFT_IDS   = [101]
         SF_RIGHT_IDS  = [102]
-        FINAL_ID      = 103
-        THIRD_ID      = 104
+        FINAL_ID      = 104
+        THIRD_ID      = 103
 
         def get_by_ids(stage_df, id_list):
             rows = []
