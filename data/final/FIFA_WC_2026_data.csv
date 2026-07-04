@@ -84,17 +84,17 @@ match_id,date,group,stage,match,team1,team2,time,venue,category,reason,score_tea
 83,03/07/2026,,Round of 32,Spain vs Austria,Spain,Austria,0:00,Los Angeles Stadium,Must Watch,Spain's possession masterclass meets Austria's aggressive gegenpressing in what could be the purest football contest of the round.,3,0,Spain,0,0,0,0,0,0,0,0,0,0,1H,2J,confirmed
 84,03/07/2026,,Round of 32,Portugal vs Croatia,Portugal,Croatia,4:00,Toronto Stadium,Worth Watching,Two technically gifted European nations with match-winners and superstars throughout generating moments of brilliance even if it stays tight.,2,1,Portugal,0,0,0,0,0,0,0,0,0,0,2K,2L,confirmed
 85,03/07/2026,,Round of 32,Switzerland vs Algeria,Switzerland,Algeria,8:00,BC Place Vancouver,Optional,"A pragmatic Swiss side against a limited Algeria team points to a tight, uneventful contest with few moments of quality.",2,0,Switzerland,0,0,0,0,0,0,0,0,0,0,1B,3EFGIJ,confirmed
-86,03/07/2026,,Round of 32,Australia vs Egypt,Australia,Egypt,22:00,Dallas Stadium,Optional,"Neither side carries enough attacking punch to make this a must-see, expect a cautious, low-scoring grind.",0,0,,0,0,0,0,0,0,0,0,0,0,2D,2G,confirmed
-87,04/07/2026,,Round of 32,Argentina vs Cabo Verde,Argentina,Cabo Verde,3:00,Miami Stadium,Worth Watching,"Messi and company should shine, but Cabo Verde's organised defending and nothing-to-lose attitude offers pockets of drama with a chance of an astounding upset",0,0,,0,0,0,0,0,0,0,0,0,0,Argentina,2H,confirmed
-88,04/07/2026,,Round of 32,Colombia vs Ghana,Colombia,Ghana,6:30,Kansas City Stadium,Optional,"Inconsistency from both sides and a lack of marquee names makes this a low-intensity and a cagey encounter, with even a possibility of penalties",0,0,,0,0,0,0,0,0,0,0,0,0,1K,3DEIJL,confirmed
+86,03/07/2026,,Round of 32,Australia vs Egypt,Australia,Egypt,22:00,Dallas Stadium,Optional,"Neither side carries enough attacking punch to make this a must-see, expect a cautious, low-scoring grind.",3,5,Egypt,0,0,0,0,0,0,0,0,0,0,2D,2G,confirmed
+87,04/07/2026,,Round of 32,Argentina vs Cabo Verde,Argentina,Cabo Verde,3:00,Miami Stadium,Worth Watching,"Messi and company should shine, but Cabo Verde's organised defending and nothing-to-lose attitude offers pockets of drama with a chance of an astounding upset",3,2,Argentina,0,0,0,0,0,0,0,0,0,0,Argentina,2H,confirmed
+88,04/07/2026,,Round of 32,Colombia vs Ghana,Colombia,Ghana,6:30,Kansas City Stadium,Optional,"Inconsistency from both sides and a lack of marquee names makes this a low-intensity and a cagey encounter, with even a possibility of penalties",1,0,Colombia,0,0,0,0,0,0,0,0,0,0,1K,3DEIJL,confirmed
 89,04/07/2026,,Round of 16,Canada vs Morocco,Canada,Morocco,22:00,Houston Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W73,W76,
 90,05/07/2026,,Round of 16,Paraguay vs Norway,Paraguay,Norway,2:00,Philadelphia Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W75,W77,
 91,06/07/2026,,Round of 16,Brazil vs France,Brazil,France,1:00,New York New Jersey Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W74,W78,
 92,06/07/2026,,Round of 16,Mexico vs England,Mexico,England,5:00,Mexico City Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W79,W80,
 93,07/07/2026,,Round of 16,Spain vs Portugal,Spain,Portugal,0:00,Dallas Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W83,W84,
 94,07/07/2026,,Round of 16,Belgium vs USA,Belgium,USA,5:00,Seattle Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W81,W82,
-95,07/07/2026,,Round of 16,W86 vs W88,W86,W88,21:00,Atlanta Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W86,W88,
-96,08/07/2026,,Round of 16,Switzerland vs W87,Switzerland,W87,1:00,BC Place Vancouver,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W85,W87,
+95,07/07/2026,,Round of 16,Egypt vs Colombia,Egypt,Colombia,21:00,Atlanta Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W86,W88,
+96,08/07/2026,,Round of 16,Switzerland vs Argentina,Switzerland,Argentina,1:00,BC Place Vancouver,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W85,W87,
 97,10/07/2026,,Quarter-final,W89 vs W90,W89,W90,1:00,Boston Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W89,W90,
 98,11/07/2026,,Quarter-final,W93 vs W94,W93,W94,0:00,Los Angeles Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W93,W94,
 99,12/07/2026,,Quarter-final,W91 vs W92,W91,W92,2:00,Miami Stadium,TBD,TBD,0,0,,0,0,0,0,0,0,0,0,0,0,W91,W92,
