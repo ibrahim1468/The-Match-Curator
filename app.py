@@ -2218,12 +2218,12 @@ if "bracket" in active_tabs and tab_bracket is not None:
 
         # ── Hardcoded bracket tree (match_id based) ───────────────────────────
         # Order within each list = top-to-bottom visual order
-        R32_LEFT_IDS  = [75, 78, 73, 76, 84, 83, 82, 81]
-        R32_RIGHT_IDS = [74, 77, 79, 80, 87, 86, 85, 88]
-        R16_LEFT_IDS  = [90, 89, 93, 94]
+        R32_LEFT_IDS  = [74, 77, 73, 75, 83, 84, 81, 82]
+        R32_RIGHT_IDS = [76, 78, 79, 80, 86, 88, 85, 87]
+        R16_LEFT_IDS  = [89, 90, 93, 94]
         R16_RIGHT_IDS = [91, 92, 95, 96]
-        QF_LEFT_IDS  = [97, 99]
-        QF_RIGHT_IDS = [98, 100]
+        QF_LEFT_IDS   = [97, 98]
+        QF_RIGHT_IDS  = [99, 100]
         SF_LEFT_IDS   = [101]
         SF_RIGHT_IDS  = [102]
         FINAL_ID      = 104
