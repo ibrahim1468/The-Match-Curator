@@ -1314,6 +1314,15 @@ def render_scoreboard_html():
     t1 = short_name(str(next_match["team1"]))
     t2 = short_name(str(next_match["team2"]))
 
+    # One-off delay notice — Mexico vs England only
+    delay_notice = ""
+    if {t1, t2} == {"Mexico", "England"}:
+        delay_notice = (
+            "<span style='display:block; text-align:center; font-size:0.68rem; "
+            "font-weight:700; color:#ff5c5c; margin-top:3px; white-space:nowrap;'>"
+            "🌧️ Delayed due to Rain</span>"
+        )
+
     return (
         f"<div class='sb-outer'>"
         f"<div class='sb-card'>"
@@ -1325,6 +1334,7 @@ def render_scoreboard_html():
         f"<div class='sb-kickoff'>"
         f"<span class='sb-kickoff-time'>{kickoff_time}</span>"
         f"<span class='sb-kickoff-sub'>{USER_TZ_LABEL}</span>"
+        f"{delay_notice}"
         f"</div>"
         f"<div class='sb-team'><span class='sb-team-name'>{t2}</span></div>"
         f"</div>"
